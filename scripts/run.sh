@@ -35,7 +35,7 @@ rm -rf "$OUT/export"
 mkdir -p "$OUT/export/lib"
 (cd "$RECIPE_DIR" && find . -type f ! -path '*/__pycache__/*' -print0 | cpio -0pdm --quiet "$OUT/export")
 cp "$ROOT"/lib/*.py "$OUT/export/lib/"
-uv pip freeze -q --python "$VENV/bin/python" > "$OUT/export/environment.txt"
+uv pip freeze --python "$VENV/bin/python" > "$OUT/export/environment.txt"
 RUN_URL=""
 [[ -n "${GITHUB_RUN_ID:-}" ]] && RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 COMMIT="$(git -C "$ROOT" rev-parse -q --verify HEAD 2>/dev/null || echo unknown)" \
