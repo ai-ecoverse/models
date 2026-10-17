@@ -15,3 +15,12 @@ target:
   repo: ai-ecoverse/tiny-random-llama-ONNX
   path: ""
 publish: false
+# What ortllama makes of the export: onnx/model{,_quantized}.onnx plus a chat
+# template read as a transformers.js decoder. Declared so PR checks run the full
+# ortllama gate; no check: the logits-only graph has no KV cache and would not
+# generate.
+ortllama:
+  engine: decoder
+  variants:
+    - q8
+    - fp32

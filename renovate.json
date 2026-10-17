@@ -13,6 +13,20 @@
       "description": "No PRs for recipe Python pins.",
       "matchManagers": ["pip_requirements"],
       "enabled": false
+    },
+    {
+      "description": "The ortllama acceptance gate (scripts/ortllama/): keep slicc-ortllama pinned exactly.",
+      "matchFileNames": ["scripts/ortllama/package.json"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "description": [
+        "onnxruntime-node in scripts/ortllama/ has to equal slicc-ortllama's exact peer version, or npm ci fails",
+        "with ERESOLVE. It moves by hand, in the same commit as a slicc-ortllama bump that changes the peer."
+      ],
+      "matchFileNames": ["scripts/ortllama/package.json"],
+      "matchPackageNames": ["onnxruntime-node"],
+      "enabled": false
     }
   ]
 }

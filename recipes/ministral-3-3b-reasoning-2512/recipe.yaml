@@ -21,6 +21,18 @@ variants:
   - fp16
   - quantized
   - fp32
+# What slicc-ortllama must see in the export (scripts/ortllama-gate.mjs); it names
+# the _quantized files q8. check: load q4f16 and run one request (~4 GB RAM).
+ortllama:
+  engine: decoder
+  default: q4f16
+  variants:
+    - q4f16
+    - q4
+    - fp16
+    - q8
+    - fp32
+  check: true
 target:
   repo: ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX
   path: ""
