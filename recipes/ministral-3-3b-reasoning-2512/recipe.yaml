@@ -4,9 +4,10 @@
 # VM; this recipe reproduces that export in CI.
 name: ministral-3-3b-reasoning-2512
 summary: "Ministral 3 3B Reasoning 2512, in Mistral's Instruct ONNX layout"
-# ~80 GB of disk (reference 35 GB, checkpoint 7.7 GB, variants 35 GB), 32+ GB RAM.
-runner: models-xl
-timeout: 340
+# ~80 GB of disk (reference 35 GB, checkpoint 7.7 GB, variants 35 GB), 32+ GB RAM:
+# a Compute Engine VM from gh-runner-broker (n2-highmem-8, 64 GB, 300 GB disk).
+runner: gce-xl
+timeout: 600
 python: "3.12"
 source:
   repo: mistralai/Ministral-3-3B-Reasoning-2512

@@ -1,6 +1,6 @@
 # PR check: convert each touched recipe without publishing and without the HF
 # token. Changes to lib/ or scripts/ re-run the smoke recipe. PRs only convert
-# recipes on ubuntu-latest; recipes on a paid larger runner are listed and
+# recipes on ubuntu-latest; recipes on other runners (gce-xl VMs) are listed and
 # skipped. Check one of those with workflow_dispatch on the branch (any
 # recipe, any runner, same rules).
 name: check
@@ -17,6 +17,11 @@ on:
       recipe:
         description: Recipe directory under recipes/
         required: true
+        type: string
+      runner:
+        description: Run on this runner label instead of the recipe's (e.g. gce-xl)
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -53,10 +58,10 @@ jobs:
             const { spawnSync } = require("node:child_process");
             const field = (r, f) => spawnSync("node", ["scripts/read-recipe.mjs", r, "--field", f], { encoding: "utf8" }).stdout.trim();
             const include = JSON.parse(process.argv[1]).map((recipe) => ({
-              recipe, runner: field(recipe, "runner") || "ubuntu-latest", timeout: Number(field(recipe, "timeout") || 120),
+              recipe, runner: process.argv[2] || field(recipe, "runner") || "ubuntu-latest", timeout: Number(field(recipe, "timeout") || 120),
             }));
             console.log(JSON.stringify({ include }));
-          ' "$RECIPES")
+          ' "$RECIPES" "${{ inputs.runner }}")
           if [[ "${{ github.event_name }}" == pull_request ]]; then
             # shellcheck disable=SC2016  # single-quoted JS template literal
             SKIP=$(node -e 'const m=JSON.parse(process.argv[1]);console.log(m.include.filter(x=>x.runner!=="ubuntu-latest").map(x=>`${x.recipe} (${x.runner})`).join(", "))' "$MATRIX")

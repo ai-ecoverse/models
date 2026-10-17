@@ -38,7 +38,7 @@ and the CI run, so every published model carries the exact recipe that made it.
 
 | Recipe | Hub repo | Runner | Notes |
 | --- | --- | --- | --- |
-| [`ministral-3-3b-reasoning-2512`](recipes/ministral-3-3b-reasoning-2512) | [ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX) | `models-xl` | Reasoning weights in Mistral's Instruct ONNX graphs; 5 variants, ~36 GB; parity gate against PyTorch fp32 |
+| [`ministral-3-3b-reasoning-2512`](recipes/ministral-3-3b-reasoning-2512) | [ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX) | `gce-xl` | Reasoning weights in Mistral's Instruct ONNX graphs; 5 variants, ~36 GB; parity gate against PyTorch fp32 |
 | [`tiny-random-llama`](recipes/tiny-random-llama) | — (`publish: false`) | `ubuntu-latest` | Pipeline smoke test; template for plain `torch.onnx.export` recipes |
 
 ## Running locally
@@ -63,9 +63,12 @@ uv run --no-project --with huggingface_hub==2.2.0 --with hf-xet==1.7.0 \
 
 | Workflow | When | Does |
 | --- | --- | --- |
-| [`check`](.github/workflows/check.yml) | PRs touching `recipes/`, `lib/`, `scripts/`; or dispatch | Converts touched recipes on `ubuntu-latest` (lib/scripts changes run `tiny-random-llama`); never publishes, no HF token. Larger-runner recipes are skipped on PRs: dispatch `check` with `recipe=<name>` on the branch to convert one. |
+| [`check`](.github/workflows/check.yml) | PRs touching `recipes/`, `lib/`, `scripts/`; or dispatch | Converts touched recipes on `ubuntu-latest` (lib/scripts changes run `tiny-random-llama`); never publishes, no HF token. Recipes on other runners are skipped on PRs: dispatch `check` with `recipe=<name>` on the branch to convert one (`runner=` overrides the recipe's runner). |
 | [`convert`](.github/workflows/convert.yml) | dispatch `recipe=<name>` (`publish` defaults to true) | Converts on the recipe's `runner`, uploads results as an artifact, publishes to `target.repo` and verifies the upload. Runs in the `huggingface` environment, which only deploys from `main`. |
 | [`convert-merge`](.github/workflows/convert-merge.yml) | push to `main` touching `recipes/<name>/` | Dispatches `convert` for each touched recipe. |
+
+A recipe change that should not republish (runner, timeout, comments) can go
+in with `[skip ci]` in the commit message, which skips `convert-merge`.
 
 Re-publishing an unchanged build is safe: `upload_folder` skips files that are
 already on the Hub, so it makes no commit.
@@ -77,12 +80,16 @@ already on the Hub, so it makes no commit.
 - `ubuntu-latest`: free for this public repo; 4 vCPU, 16 GB RAM, ~14 GB
   disk (more after the workflow's cleanup step). Enough for models up to
   roughly 1B parameters.
-- `models-xl`: a GitHub-hosted larger runner in the org's `models` runner
-  group (Ubuntu 24.04, 16 vCPU, 64 GB RAM, 600 GB SSD), billed per minute
-  from the org's Actions budget. Used for 3B-class models.
+- `gce-xl`: one Compute Engine VM per job in GCP project `helix-research`
+  (n2-highmem-8: 8 vCPU, 64 GB RAM, 300 GB disk, on demand, about $0.55 an
+  hour), started by [gh-runner-broker](https://github.com/ai-ecoverse/gh-runner-broker)
+  when a job asks for the label and deleted when the job ends. Runner group
+  `gce-xl`, open to this repo only; at most 2 VMs at a time. Used for
+  3B-class models.
 
-The Cloud Run runners (`cloud-run-bench` etc.) keep their filesystem in RAM,
-so they can't hold the ~80 GB a 3B-model conversion writes.
+The Cloud Run runners (`cloud-run-gpu`, `cloud-run-bench`, …) stop at 8 vCPU
+and 32 GiB with the filesystem in RAM, so they can't hold the ~80 GB a
+3B-model conversion writes.
 
 ## Secrets
 
