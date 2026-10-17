@@ -1,0 +1,17 @@
+# Pipeline smoke test: a 1M-parameter random Llama through torch.onnx.export
+# and onnxruntime's dynamic int8 quantization, with a logit parity gate.
+# Never published (publish: false); PR checks run it on every touched recipe
+# change under lib/ or scripts/. Copy it as the starting point for a plain
+# "export from PyTorch" recipe.
+name: tiny-random-llama
+summary: "Tiny random Llama: torch.onnx.export + int8, CI smoke test"
+runner: ubuntu-latest
+timeout: 30
+python: "3.12"
+source:
+  repo: hf-internal-testing/tiny-random-LlamaForCausalLM
+  revision: 9fb191250dd56d0ba7ec9785a025ed29c03d5998
+target:
+  repo: ai-ecoverse/tiny-random-llama-ONNX
+  path: ""
+publish: false

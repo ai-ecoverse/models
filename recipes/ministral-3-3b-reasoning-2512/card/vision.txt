@@ -1,0 +1,10 @@
+The 4-bit vision encoders are lossy, here as in Mistral's export. On the test image (192 merged patches), against each export's own fp32 vision encoder:
+
+| Vision encoder | this repo: mean / worst-patch cosine | Mistral's Instruct ONNX: mean / worst-patch cosine |
+|---|---|---|
+| `fp16` | 1.00000 / 1.0000 | 1.00000 / 1.0000 |
+| `quantized` (8-bit) | 0.99989 / 0.9989 | 0.99844 / 0.9911 |
+| `q4` | 0.96689 / 0.7339 | 0.78922 / 0.3397 |
+| `q4f16` | 0.96689 / 0.7517 | 0.78954 / 0.3415 |
+
+That is why transformers.js defaults to the `fp16` vision encoder with the `q4f16` decoder (`transformers.js_config`); for image work, prefer `vision_encoder_fp16` or `vision_encoder_quantized`.

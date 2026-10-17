@@ -1,0 +1,99 @@
+# PR check: convert each touched recipe without publishing and without the HF
+# token. Changes to lib/ or scripts/ re-run the smoke recipe. PRs only convert
+# recipes on ubuntu-latest; recipes on a paid larger runner are listed and
+# skipped. Check one of those with workflow_dispatch on the branch (any
+# recipe, any runner, same rules).
+name: check
+
+on:
+  pull_request:
+    paths:
+      - 'recipes/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - '.github/workflows/check.yml'
+  workflow_dispatch:
+    inputs:
+      recipe:
+        description: Recipe directory under recipes/
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.event.pull_request.number || github.ref }}-${{ inputs.recipe }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.d.outputs.matrix }}
+      any: ${{ steps.d.outputs.any }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: d
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == workflow_dispatch ]]; then
+            RECIPES='["${{ inputs.recipe }}"]'
+          else
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            RECIPES=$(node scripts/list-touched-recipes.mjs --base "$BASE" --head "$HEAD" --json)
+            if git diff --name-only "$BASE...$HEAD" | grep -qE '^(lib|scripts)/'; then
+              RECIPES=$(node -e 'const r=new Set(JSON.parse(process.argv[1]));r.add("tiny-random-llama");console.log(JSON.stringify([...r].sort()))' "$RECIPES")
+            fi
+          fi
+          MATRIX=$(node -e '
+            const { spawnSync } = require("node:child_process");
+            const field = (r, f) => spawnSync("node", ["scripts/read-recipe.mjs", r, "--field", f], { encoding: "utf8" }).stdout.trim();
+            const include = JSON.parse(process.argv[1]).map((recipe) => ({
+              recipe, runner: field(recipe, "runner") || "ubuntu-latest", timeout: Number(field(recipe, "timeout") || 120),
+            }));
+            console.log(JSON.stringify({ include }));
+          ' "$RECIPES")
+          if [[ "${{ github.event_name }}" == pull_request ]]; then
+            # shellcheck disable=SC2016  # single-quoted JS template literal
+            SKIP=$(node -e 'const m=JSON.parse(process.argv[1]);console.log(m.include.filter(x=>x.runner!=="ubuntu-latest").map(x=>`${x.recipe} (${x.runner})`).join(", "))' "$MATRIX")
+            [[ -n "$SKIP" ]] && echo "::notice::not converted on PRs: $SKIP. Run the check workflow on this branch to convert them."
+            MATRIX=$(node -e 'const m=JSON.parse(process.argv[1]);m.include=m.include.filter(x=>x.runner==="ubuntu-latest");console.log(JSON.stringify(m))' "$MATRIX")
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "any=$(node -e 'console.log(JSON.parse(process.argv[1]).include.length>0)' "$MATRIX")" >> "$GITHUB_OUTPUT"
+          echo "$MATRIX"
+
+  convert:
+    needs: detect
+    if: needs.detect.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    env:
+      UV_TORCH_BACKEND: cpu
+      HF_HUB_DISABLE_PROGRESS_BARS: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: astral-sh/setup-uv@v10
+      - name: Free disk
+        if: matrix.runner == 'ubuntu-latest'
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: Convert (no publish)
+        run: bash scripts/run.sh "${{ matrix.recipe }}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: results-${{ matrix.recipe }}
+          path: |
+            .models-out/${{ matrix.recipe }}/results
+            .models-out/${{ matrix.recipe }}/out/README.md
+          if-no-files-found: ignore

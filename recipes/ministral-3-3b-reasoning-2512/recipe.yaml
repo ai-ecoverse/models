@@ -1,0 +1,26 @@
+# Mistral's own Ministral-3-3B-Instruct-2512-ONNX graphs, with the Reasoning
+# checkpoint's weights written at the reference's offsets and quantized the
+# reference's way. Published 2026-10-17 at revision ecbf1de from a one-off GCE
+# VM; this recipe reproduces that export in CI.
+name: ministral-3-3b-reasoning-2512
+summary: "Ministral 3 3B Reasoning 2512, in Mistral's Instruct ONNX layout"
+# ~80 GB of disk (reference 35 GB, checkpoint 7.7 GB, variants 35 GB), 32+ GB RAM.
+runner: models-xl
+timeout: 340
+python: "3.12"
+source:
+  repo: mistralai/Ministral-3-3B-Reasoning-2512
+  revision: 4a36357c811bf511a7b625d132e12f22408aac91
+reference:
+  repo: mistralai/Ministral-3-3B-Instruct-2512-ONNX
+  revision: e1128d389145f96bb1c3c2625cb8ca255ffa7034
+variants:
+  - q4f16
+  - q4
+  - fp16
+  - quantized
+  - fp32
+target:
+  repo: ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX
+  path: ""
+publish: true

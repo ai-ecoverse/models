@@ -1,0 +1,118 @@
+# Convert one recipe on its runner and publish it to Hugging Face.
+# See README.md. The HF token lives in the `huggingface` environment, which
+# only deploys from main.
+#
+# Triggers:
+#   workflow_dispatch: manual, and convert-merge (via createWorkflowDispatch)
+name: convert
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipe:
+        description: Recipe directory under recipes/ (e.g. tiny-random-llama)
+        required: true
+        type: string
+      publish:
+        description: Upload to Hugging Face (recipes with publish false never upload)
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: convert-${{ inputs.recipe }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.r.outputs.runner }}
+      timeout: ${{ steps.r.outputs.timeout }}
+      publish: ${{ steps.r.outputs.publish }}
+      repo: ${{ steps.r.outputs.repo }}
+      path: ${{ steps.r.outputs.path }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: r
+        run: |
+          set -euo pipefail
+          R="${{ inputs.recipe }}"
+          field() { node scripts/read-recipe.mjs "$R" --field "$1"; }
+          RUNNER=$(field runner)
+          if [[ "$RUNNER" == retired ]]; then
+            echo "::error::recipe '$R' is retired"
+            exit 2
+          fi
+          PUBLISH=false
+          if [[ "${{ inputs.publish }}" == true && "$(field publish)" == true ]]; then PUBLISH=true; fi
+          {
+            echo "runner=${RUNNER:-ubuntu-latest}"
+            echo "timeout=$(field timeout || true)"
+            echo "publish=$PUBLISH"
+            echo "repo=$(field target.repo)"
+            echo "path=$(field target.path)"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  convert:
+    needs: resolve
+    runs-on: ${{ needs.resolve.outputs.runner }}
+    timeout-minutes: ${{ fromJSON(needs.resolve.outputs.timeout || '120') }}
+    environment: huggingface
+    env:
+      UV_TORCH_BACKEND: cpu
+      HF_HUB_DISABLE_PROGRESS_BARS: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: astral-sh/setup-uv@v10
+      - name: Free disk
+        if: needs.resolve.outputs.runner == 'ubuntu-latest'
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: Machine
+        run: |
+          nproc; free -g; df -h "$GITHUB_WORKSPACE"
+          echo "MODELS_BUILT_ON=GitHub Actions runner \`${{ needs.resolve.outputs.runner }}\` ($(uname -m), $(nproc) vCPU, $(free -g | awk '/Mem:/{print $2}') GB RAM)" >> "$GITHUB_ENV"
+      - name: Convert
+        env:
+          # Read access for gated source models; recipes never see it as an upload credential.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: bash scripts/run.sh "${{ inputs.recipe }}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: results-${{ inputs.recipe }}
+          path: |
+            .models-out/${{ inputs.recipe }}/results
+            .models-out/${{ inputs.recipe }}/out/README.md
+            .models-out/${{ inputs.recipe }}/out/export
+          if-no-files-found: ignore
+      - name: Publish to ${{ needs.resolve.outputs.repo }}
+        id: publish
+        if: needs.resolve.outputs.publish == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          OUT=".models-out/${{ inputs.recipe }}/out"
+          uv run --no-project --python 3.12 --with huggingface_hub==2.2.0 --with hf-xet==1.7.0 \
+            python -I scripts/publish.py --repo "${{ needs.resolve.outputs.repo }}" --dir "$OUT" \
+              --path "${{ needs.resolve.outputs.path }}" --report "$RUNNER_TEMP/verify.json" \
+              --message "${{ inputs.recipe }} from ai-ecoverse/models@${GITHUB_SHA::7} (run $GITHUB_RUN_ID)"
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ inputs.recipe }}"
+            echo
+            echo "runner \`${{ needs.resolve.outputs.runner }}\`, publish ${{ needs.resolve.outputs.publish }}"
+            if [[ -n "${{ steps.publish.outputs.revision }}" ]]; then
+              echo
+              echo "Published https://huggingface.co/${{ needs.resolve.outputs.repo }}/tree/${{ steps.publish.outputs.revision }}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
