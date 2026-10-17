@@ -1,0 +1,18 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "description": [
+    "Recipe requirements.txt pins are part of a reproducible export: a bump can change the published bytes",
+    "(quantizer rounding, exporter graphs), and merging one republishes the model. Bump them by hand, with a",
+    "check run, when a recipe needs it. Workflow actions still get PRs."
+  ],
+  "semanticCommits": "enabled",
+  "dependencyDashboard": true,
+  "packageRules": [
+    {
+      "description": "No PRs for recipe Python pins.",
+      "matchManagers": ["pip_requirements"],
+      "enabled": false
+    }
+  ]
+}

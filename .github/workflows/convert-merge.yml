@@ -30,7 +30,8 @@ jobs:
           BEFORE="${{ github.event.before }}"
           AFTER="${{ github.sha }}"
           if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
-            BEFORE=$(git rev-parse HEAD^ 2>/dev/null || echo HEAD)
+            # New branch or first push: compare with the parent, or nothing at the root commit.
+            BEFORE=$(git rev-parse -q --verify "$AFTER^" || echo "$AFTER")
           fi
           RECIPES=$(node scripts/list-touched-recipes.mjs --base "$BEFORE" --head "$AFTER" --json)
           echo "recipes=$RECIPES" >> "$GITHUB_OUTPUT"
