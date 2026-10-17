@@ -14,9 +14,9 @@
  * published model out on purpose.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, delimiter, dirname, join, resolve } from 'node:path';
+import { basename, delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -139,6 +139,58 @@ for (const v of spec.variants.filter((x) => entry.variants.includes(x))) {
     problems.push(error.message);
   }
 }
+
+// ortllama only expects a <graph>_data file when config.json declares it or it
+// exists, so a graph whose weights point at a missing file would still resolve.
+// Read the locations from the graphs themselves: TensorProto.external_data holds
+// StringStringEntryProto { key: "location", value } (fields 1 and 2).
+const LOCATION = Buffer.from([0x0a, 0x08, ...Buffer.from('location'), 0x12]);
+
+async function externalData(path) {
+  const found = new Set();
+  let tail = Buffer.alloc(0);
+  for await (const chunk of createReadStream(path, { highWaterMark: 16 << 20 })) {
+    const buf = Buffer.concat([tail, chunk]);
+    let at = buf.indexOf(LOCATION);
+    while (at !== -1) {
+      let i = at + LOCATION.length;
+      let len = 0;
+      for (let shift = 0; i < buf.length && shift < 28; shift += 7) {
+        const b = buf[i++];
+        len |= (b & 0x7f) << shift;
+        if (!(b & 0x80)) break;
+      }
+      if (i + len > buf.length) break; // value runs past the chunk: picked up from the tail
+      found.add(buf.subarray(i, i + len).toString('utf8'));
+      at = buf.indexOf(LOCATION, at + 1);
+    }
+    tail = buf.subarray(Math.max(0, buf.length - 4096));
+  }
+  return found;
+}
+
+function graphs(dir) {
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, e.name);
+    if (e.isDirectory() && !(dir === out && e.name === 'export')) out.push(...graphs(path));
+    else if (e.isFile() && e.name.endsWith('.onnx')) out.push(path);
+  }
+  return out;
+}
+report.externalData = {};
+for (const graph of graphs(out)) {
+  const rel = relative(out, graph);
+  const locations = [...(await externalData(graph))].sort();
+  report.externalData[rel] = locations;
+  for (const loc of locations) {
+    const path = resolve(dirname(graph), loc);
+    if (relative(out, path).startsWith('..') || !existsSync(path) || !statSync(path).isFile())
+      problems.push(`${rel} keeps weights in ${loc}, which is not in the export`);
+  }
+}
+const graphCount = Object.keys(report.externalData).length;
+say(`external data: ${graphCount} graph(s), ${Object.values(report.externalData).flat().length} data file reference(s) checked`);
 
 if (spec.check === 'true' && problems.length > 0) say('skipping ortllama check: the listing already failed');
 if (spec.check === 'true' && problems.length === 0) {

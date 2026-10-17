@@ -15,10 +15,18 @@
       "enabled": false
     },
     {
-      "description": "The ortllama acceptance gate (scripts/ortllama/): slicc-ortllama and onnxruntime-node at its peer version, in one PR.",
+      "description": "The ortllama acceptance gate (scripts/ortllama/): keep slicc-ortllama pinned exactly.",
       "matchFileNames": ["scripts/ortllama/package.json"],
-      "groupName": "slicc-ortllama gate",
       "rangeStrategy": "pin"
+    },
+    {
+      "description": [
+        "onnxruntime-node in scripts/ortllama/ has to equal slicc-ortllama's exact peer version, or npm ci fails",
+        "with ERESOLVE. It moves by hand, in the same commit as a slicc-ortllama bump that changes the peer."
+      ],
+      "matchFileNames": ["scripts/ortllama/package.json"],
+      "matchPackageNames": ["onnxruntime-node"],
+      "enabled": false
     }
   ]
 }

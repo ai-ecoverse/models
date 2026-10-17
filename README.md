@@ -49,8 +49,11 @@ ortllama home, and fails unless:
 
 - `ortllama ls` lists the folder (as `local/<dir>`) with the declared `engine`;
 - its variants are exactly the declared `variants`, no more and no fewer;
-- every variant resolves with all its files (external data, `embed_tokens`,
-  tokenizer, chat template), which listing alone doesn't check;
+- every variant resolves with all its files (`embed_tokens`, tokenizer, chat
+  template, the external data `config.json` declares), which listing alone
+  doesn't check;
+- every external data file an `.onnx` graph in the export points to is there
+  (ortllama only looks for data files it is told about or that exist);
 - with `default:`, the default variant is that one;
 - with `check: true`, `ortllama check` loads the default variant and answers one
   request (installs `onnxruntime-node` too; a 3B q4f16 needs ~4 GB RAM).
@@ -58,17 +61,23 @@ ortllama home, and fails unless:
 The declaration in `recipe.yaml`:
 
 ```yaml
+# engine: decoder, whisper, kokoro, silero or systemone (kev.js)
+# default: optional; variants: ortllama's names, so the _quantized suffix is q8
+# check: optional, off by default; only on runners with the RAM
 ortllama:
-  engine: decoder      # decoder, whisper, kokoro, silero, systemone (kev.js)
-  default: q4f16       # optional
-  variants:            # ortllama's names: the _quantized suffix is q8
+  engine: decoder
+  default: q4f16
+  variants:
     - q4f16
     - q4
     - fp16
     - q8
     - fp32
-  check: true          # optional, off by default: only on runners with the RAM
+  check: true
 ```
+
+`read-recipe.mjs` reads a small YAML subset: comments go on their own lines, and
+lists are `- item` blocks.
 
 A recipe with `publish: true` and no `ortllama:` block fails the gate: every
 published export has to say what ortllama should make of it, or opt out with
