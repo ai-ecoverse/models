@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run one recipe on this machine: venv from requirements.txt, convert.sh, then
-# export/ (the recipe and lib/) and export/provenance.json next to the model.
+# export/ (the recipe and lib/) and export/provenance.json next to the model,
+# then the slicc-ortllama gate on the finished folder (scripts/ortllama-gate.mjs).
 #
 #   bash scripts/run.sh tiny-random-llama          # → .models-out/tiny-random-llama/out
 #   FORCE=1 bash scripts/run.sh tiny-random-llama  # start from an empty out/ and results/
@@ -53,6 +54,16 @@ json.dump({
     "built_on": e["MODELS_BUILT_ON"],
 }, open(sys.argv[1], "w"), indent=1)
 PY
+
+echo "== $NAME: ortllama gate"
+# Pinned in scripts/ortllama/; onnxruntime-node (optional) only for ortllama.check: true.
+ORTLLAMA="${MODELS_WORK:-$ROOT/.models-out}/.ortllama"
+mkdir -p "$ORTLLAMA"
+cp "$ROOT/scripts/ortllama/package.json" "$ROOT/scripts/ortllama/package-lock.json" "$ORTLLAMA/"
+OPTIONAL=--omit=optional
+[[ "${RECIPE_ORTLLAMA_CHECK:-}" == true ]] && OPTIONAL=--include=optional
+(cd "$ORTLLAMA" && npm ci --silent --ignore-scripts --no-audit --no-fund "$OPTIONAL")
+node "$ROOT/scripts/ortllama-gate.mjs" "$NAME" --out "$OUT" --results "$RESULTS" --ortllama "$ORTLLAMA"
 
 echo "== $NAME: done"
 (cd "$OUT" && find . -type f ! -path './export/*' -exec ls -l {} + | awk '{printf "%12d  %s\n", $5, $9}' | sort -k2)

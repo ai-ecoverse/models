@@ -11,13 +11,15 @@ a copy of the recipe that made it.
 
 ```text
 recipes/<name>/
-  recipe.yaml       # source repo + revision, target repo, runner, timeout, publish
+  recipe.yaml       # source repo + revision, target repo, runner, timeout, publish, ortllama
   requirements.txt  # pinned Python packages (uv venv per recipe)
   convert.sh        # recipe body: runs in $WORK, writes the Hub repo's files to $OUT
   *.py, card/ …     # whatever the conversion needs, plus the model card template
 lib/                # shared Python for recipes (fetch.py: verified, resumable Hub download)
 scripts/
-  run.sh            # run one recipe: venv, convert.sh, export/ + provenance.json
+  run.sh            # run one recipe: venv, convert.sh, export/ + provenance.json, ortllama gate
+  ortllama-gate.mjs # fail unless slicc-ortllama lists the export as recipe.yaml declares
+  ortllama/         # the pinned slicc-ortllama (package.json + lock) the gate runs
   publish.py        # upload_folder to the Hub, then verify every file (SHA-256, fresh download)
   read-recipe.mjs   # recipe.yaml fields (--field, --json, --env)
   list-touched-recipes.mjs
@@ -34,16 +36,66 @@ model: each recipe has a parity gate.
 resolved `environment.txt` and a `provenance.json` holding this repo's commit
 and the CI run, so every published model carries the exact recipe that made it.
 
+### slicc-ortllama gate
+
+Last, `run.sh` runs [`scripts/ortllama-gate.mjs`](scripts/ortllama-gate.mjs) on
+the finished `$OUT`, the folder that gets published.
+[slicc-ortllama](https://github.com/ai-ecoverse/slicc-ortllama) finds models by
+file layout alone, so an export with a file name it doesn't know would publish
+fine and never show up in `ortllama ls`. The gate installs the slicc-ortllama
+pinned in [`scripts/ortllama/`](scripts/ortllama/package.json) (Renovate bumps
+it), points `ORTLLAMA_MODEL_PATH` at `$OUT` with an empty Hugging Face cache and
+ortllama home, and fails unless:
+
+- `ortllama ls` lists the folder (as `local/<dir>`) with the declared `engine`;
+- its variants are exactly the declared `variants`, no more and no fewer;
+- every variant resolves with all its files (external data, `embed_tokens`,
+  tokenizer, chat template), which listing alone doesn't check;
+- with `default:`, the default variant is that one;
+- with `check: true`, `ortllama check` loads the default variant and answers one
+  request (installs `onnxruntime-node` too; a 3B q4f16 needs ~4 GB RAM).
+
+The declaration in `recipe.yaml`:
+
+```yaml
+ortllama:
+  engine: decoder      # decoder, whisper, kokoro, silero, systemone (kev.js)
+  default: q4f16       # optional
+  variants:            # ortllama's names: the _quantized suffix is q8
+    - q4f16
+    - q4
+    - fp16
+    - q8
+    - fp32
+  check: true          # optional, off by default: only on runners with the RAM
+```
+
+A recipe with `publish: true` and no `ortllama:` block fails the gate: every
+published export has to say what ortllama should make of it, or opt out with
+`ortllama: none`. Without the block and with `publish: false` the gate only
+records what ortllama sees. The result, with ortllama's full listing, goes to
+`$RESULTS/ortllama.json` next to the parity numbers.
+
+To try the gate on a folder by hand (Hub snapshots are symlinks into `blobs/`,
+which ortllama doesn't follow for local folders, so copy one with `cp -RL`
+first):
+
+```bash
+mkdir -p .models-out/.ortllama && cp scripts/ortllama/package*.json .models-out/.ortllama/
+(cd .models-out/.ortllama && npm ci --ignore-scripts --include=optional)
+node scripts/ortllama-gate.mjs <recipe> --out <folder> --results /tmp/gate --ortllama .models-out/.ortllama
+```
+
 ## Recipes
 
 | Recipe | Hub repo | Runner | Notes |
 | --- | --- | --- | --- |
-| [`ministral-3-3b-reasoning-2512`](recipes/ministral-3-3b-reasoning-2512) | [ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX) | `gce-xl` | Reasoning weights in Mistral's Instruct ONNX graphs; 5 variants, ~36 GB; parity gate against PyTorch fp32 |
-| [`tiny-random-llama`](recipes/tiny-random-llama) | — (`publish: false`) | `ubuntu-latest` | Pipeline smoke test; template for plain `torch.onnx.export` recipes |
+| [`ministral-3-3b-reasoning-2512`](recipes/ministral-3-3b-reasoning-2512) | [ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX) | `gce-xl` | Reasoning weights in Mistral's Instruct ONNX graphs; 5 variants, ~36 GB; parity gate against PyTorch fp32; ortllama gate with `check` |
+| [`tiny-random-llama`](recipes/tiny-random-llama) | — (`publish: false`) | `ubuntu-latest` | Pipeline smoke test; template for plain `torch.onnx.export` recipes; runs the ortllama gate (no `check`) |
 
 ## Running locally
 
-Needs Node, [uv](https://docs.astral.sh/uv/) and the disk and RAM the recipe
+Needs Node 24+, [uv](https://docs.astral.sh/uv/) and the disk and RAM the recipe
 asks for in `recipe.yaml`.
 
 ```bash
@@ -63,8 +115,8 @@ uv run --no-project --with huggingface_hub==2.2.0 --with hf-xet==1.7.0 \
 
 | Workflow | When | Does |
 | --- | --- | --- |
-| [`check`](.github/workflows/check.yml) | PRs touching `recipes/`, `lib/`, `scripts/`; or dispatch | Converts touched recipes on `ubuntu-latest` (lib/scripts changes run `tiny-random-llama`); never publishes, no HF token. Recipes on other runners are skipped on PRs: dispatch `check` with `recipe=<name>` on the branch to convert one (`runner=` overrides the recipe's runner). |
-| [`convert`](.github/workflows/convert.yml) | dispatch `recipe=<name>` (`publish` defaults to true) | Converts on the recipe's `runner`, uploads results as an artifact, publishes to `target.repo` and verifies the upload. Runs in the `huggingface` environment, which only deploys from `main`. |
+| [`check`](.github/workflows/check.yml) | PRs touching `recipes/`, `lib/`, `scripts/`; or dispatch | Converts touched recipes on `ubuntu-latest` (lib/scripts changes run `tiny-random-llama`), parity and ortllama gates included; never publishes, no HF token. Recipes on other runners are skipped on PRs: dispatch `check` with `recipe=<name>` on the branch to convert one (`runner=` overrides the recipe's runner). |
+| [`convert`](.github/workflows/convert.yml) | dispatch `recipe=<name>` (`publish` defaults to true) | Converts on the recipe's `runner` (a failed parity or ortllama gate stops it before publishing), uploads results as an artifact, publishes to `target.repo` and verifies the upload. Runs in the `huggingface` environment, which only deploys from `main`. |
 | [`convert-merge`](.github/workflows/convert-merge.yml) | push to `main` touching `recipes/<name>/` | Dispatches `convert` for each touched recipe. |
 
 A recipe change that should not republish (runner, timeout, comments) can go
@@ -103,9 +155,11 @@ and 32 GiB with the filesystem in RAM, so they can't hold the ~80 GB a
    to the model at hand.
 2. Pin `source.revision` to a Hub commit, not a branch.
 3. Make `convert.sh` fail when parity with the source model is off.
-4. Run it locally, or open a PR: `check` converts it if it fits on
+4. Declare `ortllama:` (engine and variants) if the model is meant for
+   slicc-ortllama, or `ortllama: none` if it isn't.
+5. Run it locally, or open a PR: `check` converts it if it fits on
    `ubuntu-latest`.
-5. Merge. `convert-merge` dispatches `convert`, which publishes.
+6. Merge. `convert-merge` dispatches `convert`, which publishes.
 
 ## License
 
