@@ -1,4 +1,4 @@
-No model was re-exported from PyTorch. The graphs are Mistral's: the Reasoning and Instruct checkpoints share one architecture and one config (`text_config` and `vision_config` are identical), so every `.onnx` file here is a byte-for-byte copy of the same file in the Instruct ONNX repo, and only the weights in the `.onnx_data` files are new. Every initializer keeps the reference's file, offset, length, dtype and shape, so the external-data layout is the same down to the byte offset.
+No model was re-exported from PyTorch. The graphs are Mistral's: the Reasoning and Instruct checkpoints share one architecture and one config (`text_config` and `vision_config` are identical), so every `.onnx` file here is a copy of the same file in the Instruct ONNX repo, with one fix in the decoders (below), and the weights in the `.onnx_data` files are new. Every initializer keeps the reference's file, offset, length, dtype and shape, so the external-data layout is the same down to the byte offset.
 
 - Base checkpoint: [mistralai/Ministral-3-3B-Reasoning-2512](https://huggingface.co/mistralai/Ministral-3-3B-Reasoning-2512) at `4a36357c811bf511a7b625d132e12f22408aac91` (`model-0000{1,2}-of-00002.safetensors`, bf16).
 - Graphs and layout: [mistralai/Ministral-3-3B-Instruct-2512-ONNX](https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-ONNX) at `e1128d389145f96bb1c3c2625cb8ca255ffa7034`. Their node names, ops (`GroupQueryAttention`, `RotaryEmbedding`, `SkipSimplifiedLayerNormalization`, `MatMulNBits`, `GatherBlockQuantized`) and the YaRN rope caches come from an onnxruntime-genai-style model builder; `cos_cache` and `sin_cache` depend on the config only and are copied.
@@ -24,9 +24,12 @@ python lib/fetch.py mistralai/Ministral-3-3B-Reasoning-2512 4a36357c811bf511a7b6
 python selftest.py --ref ref --tmp selftest-tmp --out results/selftest.json --tolerance 0.0005
 python build.py --ref ref --ckpt ckpt --out out --variants q4f16 q4 fp16 quantized fp32
 python assemble.py --ref ref --ckpt ckpt --out out
+python fix_llama4.py --out out --ckpt ckpt --results results
 python parity.py torch --ckpt ckpt --repo out --ref-out results/torch
 python parity.py onnx --repo out --variant q4f16 --ref-out results/torch --out results/onnx-q4f16.json   # and every other variant
 python gate.py results q4f16 q4 fp16 quantized fp32
 ```
+
+**Long-context fix.** Ministral 3 multiplies its queries by `1 + 0.1 · log(1 + floor(position / 16384))` (transformers' `get_llama_4_attn_scale`, with `original_max_position_embeddings` = 16384). Mistral's decoder graphs compute this in `/model/llama4_scaling` with 262144 as the divisor, and the fp16 graphs store that constant as fp16, where it overflows to inf, so the scale was 1 at every position and outputs drifted from PyTorch past position 16,383. `fix_llama4.py` replaces that subgraph in every decoder with one computed in float32 (fp16 can't represent positions above 2048 exactly) from the checkpoint's config, cast to the graph's dtype at the end, and checks it against the transformers formula at positions around each multiple of 16384. Revisions of this repo before the fix have the original graphs; the weights are unchanged.
 
 `fetch.py` downloads with HTTP range resumption and checks every file's SHA-256 against the Hub before use. `gate.py` fails the build if any variant drifts further from PyTorch than this export's numbers allow. `build.py --variants fp32` rebuilds any variant from the base checkpoint in a few minutes on a CPU box with 32 GB of RAM. The upload was verified by downloading every file again and comparing SHA-256 with the local build and with the Hub's LFS metadata.
