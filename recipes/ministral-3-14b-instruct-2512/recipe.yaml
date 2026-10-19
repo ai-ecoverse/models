@@ -1,0 +1,33 @@
+# Ministral 3 14B Instruct → ONNX in Mistral's transformers.js layout: a genai-builder decoder
+# (q4f16, q4), and Mistral's 3B fp16 vision encoder and embedding graphs with this
+# checkpoint's weights. Code: lib/ministral3. Requested in ai-ecoverse/slicc-ortllama#47.
+name: ministral-3-14b-instruct-2512
+summary: "Ministral 3 14B Instruct 2512 as ONNX (q4f16, q4; fp16 vision)"
+# 14B: ~60 GB RAM for the PyTorch fp32 parity reference; gce-xl VMs have 128 GB.
+runner: gce-xl
+timeout: 600
+python: "3.12"
+source:
+  repo: mistralai/Ministral-3-14B-Instruct-2512-BF16
+  revision: 3cea74c1ebaf5ce5f5a2553de470e2ceab825142
+reference:
+  repo: mistralai/Ministral-3-3B-Instruct-2512-ONNX
+  revision: e1128d389145f96bb1c3c2625cb8ca255ffa7034
+variants:
+  - q4f16
+  - q4
+# What slicc-ortllama must see in the export (scripts/ortllama-gate.mjs).
+# check: load q4f16 and run one request on the gce-xl VM.
+ortllama:
+  engine: decoder
+  default: q4f16
+  variants:
+    - q4f16
+    - q4
+  check: true
+card:
+  title: "Ministral 3 14B Instruct 2512 ONNX"
+target:
+  repo: ai-ecoverse/Ministral-3-14B-Instruct-2512-ONNX
+  path: ""
+publish: true

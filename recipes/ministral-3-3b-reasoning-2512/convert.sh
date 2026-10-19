@@ -12,6 +12,8 @@ $P "$RECIPE_DIR/selftest.py" --ref ref --tmp selftest-tmp --out "$RESULTS/selfte
 $P "$RECIPE_DIR/build.py" --ref ref --ckpt ckpt --out "$OUT" --variants $RECIPE_VARIANTS
 mv "$OUT"/build-*.json "$RESULTS/"
 $P "$RECIPE_DIR/assemble.py" --ref ref --ckpt ckpt --out "$OUT"
+# Mistral's graphs divide by 262144 (inf in fp16) in the long-context query scaling; use transformers' 16384.
+$P "$RECIPE_DIR/fix_llama4.py" --out "$OUT" --ckpt ckpt --results "$RESULTS"
 
 $P "$RECIPE_DIR/parity.py" torch --ckpt ckpt --repo "$OUT" --ref-out "$RESULTS/torch"
 for v in $RECIPE_VARIANTS; do

@@ -15,7 +15,8 @@ recipes/<name>/
   requirements.txt  # pinned Python packages (uv venv per recipe)
   convert.sh        # recipe body: runs in $WORK, writes the Hub repo's files to $OUT
   *.py, card/ …     # whatever the conversion needs, plus the model card template
-lib/                # shared Python for recipes (fetch.py: verified, resumable Hub download)
+lib/                # shared code for recipes (fetch.py: verified, resumable Hub download)
+  ministral3/       # Ministral 3 8B/14B export: genai-builder decoder, re-weighted 3B vision/embed graphs
 scripts/
   run.sh            # run one recipe: venv, convert.sh, export/ + provenance.json, ortllama gate
   ortllama-gate.mjs # fail unless slicc-ortllama lists the export as recipe.yaml declares
@@ -100,6 +101,10 @@ node scripts/ortllama-gate.mjs <recipe> --out <folder> --results /tmp/gate --ort
 | Recipe | Hub repo | Runner | Notes |
 | --- | --- | --- | --- |
 | [`ministral-3-3b-reasoning-2512`](recipes/ministral-3-3b-reasoning-2512) | [ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX) | `gce-xl` | Reasoning weights in Mistral's Instruct ONNX graphs; 5 variants, ~36 GB; parity gate against PyTorch fp32; ortllama gate with `check` |
+| [`ministral-3-8b-instruct-2512`](recipes/ministral-3-8b-instruct-2512) | [ai-ecoverse/Ministral-3-8B-Instruct-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-8B-Instruct-2512-ONNX) | `gce-xl` | genai-builder decoder (q4f16, q4) + fp16 vision/embeddings ([`lib/ministral3`](lib/ministral3)); from the BF16 checkpoint; ortllama gate with `check` |
+| [`ministral-3-8b-reasoning-2512`](recipes/ministral-3-8b-reasoning-2512) | [ai-ecoverse/Ministral-3-8B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-8B-Reasoning-2512-ONNX) | `gce-xl` | same |
+| [`ministral-3-14b-instruct-2512`](recipes/ministral-3-14b-instruct-2512) | [ai-ecoverse/Ministral-3-14B-Instruct-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-14B-Instruct-2512-ONNX) | `gce-xl` | same; ~60 GB RAM for the fp32 parity reference |
+| [`ministral-3-14b-reasoning-2512`](recipes/ministral-3-14b-reasoning-2512) | [ai-ecoverse/Ministral-3-14B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-14B-Reasoning-2512-ONNX) | `gce-xl` | same |
 | [`tiny-random-llama`](recipes/tiny-random-llama) | — (`publish: false`) | `ubuntu-latest` | Pipeline smoke test; template for plain `torch.onnx.export` recipes; runs the ortllama gate (no `check`) |
 
 ## Running locally
@@ -142,7 +147,7 @@ already on the Hub, so it makes no commit.
   disk (more after the workflow's cleanup step). Enough for models up to
   roughly 1B parameters.
 - `gce-xl`: one Compute Engine VM per job in GCP project `helix-research`
-  (n2-highmem-8: 8 vCPU, 64 GB RAM, 300 GB disk, on demand, about $0.55 an
+  (n2-highmem-16: 16 vCPU, 128 GB RAM, 400 GB disk, on demand, about $1.05 an
   hour), started by [gh-runner-broker](https://github.com/ai-ecoverse/gh-runner-broker)
   when a job asks for the label and deleted when the job ends. Runner group
   `gce-xl`, open to this repo only; at most 2 VMs at a time. Used for

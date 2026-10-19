@@ -34,8 +34,9 @@ while IFS= read -r v; do export "${v%%=*}"; done < <(node "$ROOT/scripts/read-re
 echo "== $NAME: export/"
 rm -rf "$OUT/export"
 mkdir -p "$OUT/export/lib"
-(cd "$RECIPE_DIR" && find . -type f ! -path '*/__pycache__/*' -print0 | cpio -0pdm --quiet "$OUT/export")
-cp "$ROOT"/lib/*.py "$OUT/export/lib/"
+for src in "$RECIPE_DIR:$OUT/export" "$ROOT/lib:$OUT/export/lib"; do
+  (cd "${src%%:*}" && find . -type f ! -path '*/__pycache__/*' -print0 | cpio -0pdm --quiet "${src#*:}")
+done
 uv pip freeze --python "$VENV/bin/python" > "$OUT/export/environment.txt"
 RUN_URL=""
 [[ -n "${GITHUB_RUN_ID:-}" ]] && RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
