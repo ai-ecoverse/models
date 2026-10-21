@@ -62,7 +62,7 @@ ortllama home, and fails unless:
 The declaration in `recipe.yaml`:
 
 ```yaml
-# engine: decoder, whisper, kokoro, phonon, silero or systemone (kev.js)
+# engine: decoder, whisper, parakeet, kokoro, phonon, silero or systemone (kev.js)
 # default: optional; variants: ortllama's names, so the _quantized suffix is q8
 # check: optional, off by default; only on runners with the RAM
 ortllama:
@@ -107,6 +107,7 @@ node scripts/ortllama-gate.mjs <recipe> --out <folder> --results /tmp/gate --ort
 | [`ministral-3-14b-reasoning-2512`](recipes/ministral-3-14b-reasoning-2512) | [ai-ecoverse/Ministral-3-14B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-14B-Reasoning-2512-ONNX) | `gce-xl` | same |
 | [`phonon-31m-en`](recipes/phonon-31m-en) | [ai-ecoverse/phonon-31m-en-ONNX](https://huggingface.co/ai-ecoverse/phonon-31m-en-ONNX) | `ubuntu-latest` | Gradium's Phonon 31m English TTS, reimplemented in PyTorch and exported (flow LM with KV cache, streaming Mimi decoder, 37 voices); parity gate against ptts (Rust, built in CI) and slicc-ortllama's tokenizer; ortllama gate with `check` |
 | [`tiny-random-llama`](recipes/tiny-random-llama) | — (`publish: false`) | `ubuntu-latest` | Pipeline smoke test; template for plain `torch.onnx.export` recipes; runs the ortllama gate (no `check`) |
+| [`underdog-bark-3.0`](recipes/underdog-bark-3.0) | [ai-ecoverse/Underdog-Bark-3.0-ONNX](https://huggingface.co/ai-ecoverse/Underdog-Bark-3.0-ONNX) | `ubuntu-latest` | Parakeet TDT speech recognition: `model.bark` unpacked with the source's loader, encoder + one-step decoder_joint graphs, fp32/fp16/q8/q4f16; parity gate against transformers' `generate()` on `say` clips; engine fixtures in `fixture/`; ortllama `parakeet` gate with `check` |
 
 ## Running locally
 

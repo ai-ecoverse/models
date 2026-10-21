@@ -1,0 +1,1 @@
+Our team shipped the new search feature and latency dropped by almost half.
