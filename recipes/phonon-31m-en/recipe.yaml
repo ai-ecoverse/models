@@ -1,0 +1,28 @@
+name: phonon-31m-en
+summary: "Phonon 31m English by Gradium: flow LM with KV cache, streaming Mimi decoder, 37 English voices"
+runner: ubuntu-latest
+timeout: 60
+python: "3.12"
+source:
+  repo: gradium/phonon-31m-en
+  revision: 541f5752bc3c79583068bb205bfda5eb39aaa08a
+voices:
+  repo: gradium/phonon-voices
+  revision: 0ee17205f254b5abc43b266c8a0f215565c352f7
+ptts:
+  repo: https://github.com/gradium-ai/xn-ptts
+  revision: 49b9033e44ab0fbb935973eca3213757644d1bbb
+  version: 0.4.1
+target:
+  repo: ai-ecoverse/phonon-31m-en-ONNX
+  path: ""
+publish: true
+ortllama:
+  engine: phonon
+  default: fp32
+  variants:
+    - fp32
+    - q8
+    - q4
+    - fp16
+  check: true
