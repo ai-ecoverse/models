@@ -21,7 +21,7 @@ variants:
   - fp16
   - q8
   - q4f16
-# What slicc-ortllama (1.23.0+, parakeet engine) must see in the export
+# What slicc-ortllama (1.24.0+, parakeet engine) must see in the export
 # (scripts/ortllama-gate.mjs). check: load q8 and transcribe one request
 # (~2 GB RAM).
 ortllama:

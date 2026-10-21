@@ -1,7 +1,9 @@
 """Lay out $OUT/onnx/ and build the variants from the fp32 export.
 
 Encoder: fp32 (one .onnx_data sidecar), fp16 (Softmax/LayerNorm/reductions kept fp32), q8 (_quantized: dynamic
-int8 on the constant-weight MatMuls), q4f16 (4-bit MatMulNBits, block 32, symmetric, then fp16). The decoder_joint
+int8 on the constant-weight MatMuls, per channel, 7-bit range: onnxruntime's x86 AVX2 u8s8 kernel (VPMADDUBSW)
+saturates its int16 pair sums with full-range int8 weights, and Bark's weights sit at the range ends, so a full-range
+q8 decodes to nothing on x86 while it is fine on ARM), q4f16 (4-bit MatMulNBits, block 32, symmetric, then fp16). The decoder_joint
 graph is small (~70 MB) and stays fp32 in every variant, written under each suffix so a variant is one suffix.
 
     python variants.py --raw raw --out $OUT/onnx --variants fp32 fp16 q8 q4f16
@@ -57,7 +59,8 @@ for v in a.variants:
         from onnxruntime.quantization import QuantType, quantize_dynamic
         with tempfile.TemporaryDirectory(dir=a.raw) as tmp:
             quantize_dynamic(enc32, f"{tmp}/q.onnx", weight_type=QuantType.QInt8, op_types_to_quantize=["MatMul"],
-                             use_external_data_format=True, extra_options={"MatMulConstBOnly": True})
+                             per_channel=True, reduce_range=True, use_external_data_format=True,
+                             extra_options={"MatMulConstBOnly": True})
             save(onnx.load(f"{tmp}/q.onnx", load_external_data=True), dst)
     elif v == "fp16":
         save(to_fp16(load_shaped()), dst)

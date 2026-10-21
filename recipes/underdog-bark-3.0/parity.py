@@ -1,12 +1,14 @@
 """Parity gate and engine fixtures.
 
 Reference: transformers' ParakeetFeatureExtractor + ParakeetForTDT.generate() on the unpacked fp32 weights.
-For each clip in clips/ (macOS `say`, 16 kHz) and each variant: the export's encoder_model + decoder_joint_model
-through tdt.py (NumPy mel, greedy TDT), compared with the reference.
+For each clip in clips/ (macOS `say`, 16 kHz) and each variant: the export's encoder_model + decoder_joint_model on
+transformers' features with tdt.py's greedy TDT, compared with the reference. The same features are the ones in
+fixture/input_features.npy, so fixture/ is one frontend throughout.
 
-Gates: tdt.py's mel within 5e-4 of transformers' on every clip; fp32 and fp16 give the reference's exact tokens and
-durations on every clip; quantized variants stay within a word error rate of the reference (case and punctuation
-folded) and are no worse against the scripts than the reference by more than 2 points.
+Gates: tdt.py's NumPy mel within 5e-4 of transformers' on every clip, and fp32 on it still gives the reference's exact
+tokens and durations; fp32 and fp16 give the reference's exact tokens and durations on every clip; quantized variants
+stay within slicc-ortllama's parakeet test bounds of word error rate against the reference (its wordErrorRate: case
+and punctuation folded) and are no worse against the scripts than the reference by more than 2 points.
 
 Writes $RESULTS/parity.json and $OUT/fixture/ (s01: audio, transformers' mel, mel filters, encoder output, and the
 expected tokens/durations/text per clip and variant) for the slicc-ortllama parakeet engine's tests.
@@ -21,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tdt  # noqa: E402
 
 SUFFIX = {"fp32": "", "fp16": "_fp16", "q8": "_quantized", "q4": "_q4", "q4f16": "_q4f16"}
-MAX_WER = {"q8": 0.03, "q4": 0.10, "q4f16": 0.10}   # vs the reference, normalized
+MAX_WER = {"q8": 0.025, "q4": 0.03, "q4f16": 0.03}   # slicc-ortllama 1.24.0 test/integration/parakeet.test.mjs
 EXACT = {"fp32", "fp16"}
 MEL_TOL = 5e-4
 
@@ -35,8 +37,8 @@ a = ap.parse_args()
 
 
 def norm(t):
-    t = t.lower().replace("%", " percent")
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9' ]", " ", t)).strip()
+    """slicc-ortllama's wordErrorRate words: lowercase, anything but letters, digits, whitespace and ' -> space."""
+    return " ".join(re.sub(r"[^\w\s']|_", " ", t.lower()).split())
 
 
 proc = AutoProcessor.from_pretrained(a.hf)
@@ -89,11 +91,14 @@ for v in a.variants:
     enc = ort.InferenceSession(f"{a.out}/onnx/encoder_model{SUFFIX[v]}.onnx", so, providers=["CPUExecutionProvider"])
     dj = ort.InferenceSession(f"{a.out}/onnx/decoder_joint_model{SUFFIX[v]}.onnx", so,
                               providers=["CPUExecutionProvider"])
-    hyps, exact, t0 = [], 0, time.time()
+    hyps, exact, numpy_exact, t0 = [], 0, 0, time.time()
     for n in names:
         r = ref[n]
-        e, el = enc.run(None, {"input_features": r["feats"], "attention_mask": r["mask"]})
+        e, el = enc.run(None, {"input_features": r["hf_feats"], "attention_mask": r["mask"]})
         toks, ds = tdt.greedy_tdt(dj, e, int(el[0]), gen)
+        if v == "fp32":                        # tdt.py's own frontend must be good enough for exact decoding
+            e2, el2 = enc.run(None, {"input_features": r["feats"], "attention_mask": r["mask"]})
+            numpy_exact += tdt.greedy_tdt(dj, e2, int(el2[0]), gen) == (r["tokens"], r["durations"])
         hyp = tdt.detokenize(toks, pieces, cfg.blank_token_id)
         exact += toks == r["tokens"] and ds == r["durations"]
         hyps.append(hyp)
@@ -107,6 +112,10 @@ for v in a.variants:
                              "wer_vs_pytorch": round(wer_ref, 4), "wer_vs_script": round(wer_script, 4),
                              "seconds": round(time.time() - t0, 2)}
     print(v, report["variants"][v], flush=True)
+    if v == "fp32":
+        report["numpy_frontend_fp32_exact"] = numpy_exact
+        if numpy_exact != len(names):
+            problems.append(f"fp32 on tdt.mel: exact tokens and durations on {numpy_exact}/{len(names)} clips")
     if v in EXACT and exact != len(names):
         problems.append(f"{v}: exact tokens and durations on {exact}/{len(names)} clips")
     if v in MAX_WER and wer_ref > MAX_WER[v]:

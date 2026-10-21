@@ -79,8 +79,9 @@ clip and variant.
 ## Parity
 
 The reference is transformers' feature extractor plus `generate()` on the unpacked fp32 weights. It was run on __CLIPS__
-English clips made with macOS `say`, and the export was run through `tdt.py` (word error rate with case and
-punctuation folded):
+English clips made with macOS `say`. The export was run on the same features, decoded greedily by `tdt.py`, with word
+error rate as slicc-ortllama computes it (case and punctuation folded). fp32 on `tdt.py`'s own NumPy features also
+matches token for token.
 
 | | Exact tokens and durations | WER vs PyTorch | WER vs script |
 | --- | --: | --: | --: |
