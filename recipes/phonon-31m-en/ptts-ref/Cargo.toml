@@ -1,0 +1,13 @@
+[package]
+name = "ptts-ref"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = "1"
+ptts = { path = "../xn-ptts/ptts", features = ["hf"] }
+serde_json = "1"
+xn = "0.2.11"
+
+[workspace]
