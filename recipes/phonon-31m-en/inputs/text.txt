@@ -1,0 +1,260 @@
+The quick brown fox jumps over the lazy dog.
+The museum opens at nine, and the tickets cost twelve dollars.
+Could you bring the umbrella? It looks like rain this afternoon.
+Please call me back when you get a chance.
+The meeting was moved to 3:30 on Tuesday.
+I paid $45.99 for the headphones, which seemed like a lot.
+Our revenue grew by 12.5% in 2024, reaching $3 million.
+Send the report to jane.doe@example.com before Friday.
+You can find the documentation at https://docs.example.org/guide.
+Dr. Smith lives on Baker St. near the old library.
+The train leaves at 7 a.m. and arrives around noon.
+She was born on March 14, 1987, in a small town.
+There are 1,234 people registered for the event.
+He finished the race in 2nd place, just behind his brother.
+The temperature dropped to -5 degrees overnight.
+Wow, that is sooooo cool!
+The old lighthouse stood at the edge of the cliff for more than a hundred years.
+Every night its keeper climbed the narrow stairs and trimmed the wick.
+Ships passing in the fog relied on that steady light to find their way around the rocks.
+Thank you for listening, and have a wonderful day.
+It costs $1.
+It costs $0.99 or £5.50, maybe €20.
+Revenue hit $2.5bn last year.
+The budget is $2 million.
+Call 555-123-4567 or +44 20 7946 0958.
+My card ends in -4242.
+ISBN 978-3-16-148410-0.
+Meet me on 2024-05-12 at 10:30.
+Lt Col Jones arrived on Jan. 5th.
+Sgt. Pepper vs. the world, approx. 50 people.
+Visit www.kyutai.fr or http://example.com/a-b/c.
+Email a.b@gra-dium.fr now!
+The ratio is 3×4 ≈ 12 ± 1, and x² + y³ = z⁴.
+It was “quoted” and ‘single’ — with dashes – here.
+Temperatures: 20°C to 25°F, and 1° of arc.
+Rated ★★★☆☆ by 1,234,567 users.
+H₂O and CO₂ are molecules.
+α, β and γ rays.
+I ❤ NYC 🎉!
+Noooo way, yesss, hmmmm.
+Wait... what?! Really?
+and/or, mg/kg, km/h, c/o.
+The year 1999 and the 1990s.
+From 1445-1450 and 20-25 people.
+007 is a code, 0600 too.
+He scored 3.14159 points.
+A 7,000-ton ship and a 20-year-old man.
+Is it 12:30 or 12.30?
+It's 50% off, #1 deal & more.
+~5 minutes
+*5 stars
+x = 5 + 3
+Ünïcödé façade naïve coöperate.
+ok
+Hi there
+This is a much longer paragraph that keeps going with many words so that the token budget of a single chunk is exceeded, and then it continues further with another clause, and yet another one, until finally it must be cut somewhere sensible by the fitting logic that the runtime applies to oversized sentences without any punctuation to split on whatsoever which is rather unusual
+First sentence here. Second one follows! Third asks a question? Fourth ends with an ellipsis... Fifth is short. Sixth is also here. Seventh wraps it up nicely. Eighth continues the story. Ninth adds detail. Tenth concludes.
+Hello, world!
+“hello” world it's
+«hello» ‹world›
+a‐b‑c‒d―e
+a–b—c
+foo (bar) [baz] {qux} *quux*
+• ‣ ◦ · a→b←c↑d↓e ➡ ➜
+wait… a…b
+user@host @home
+café résumé 日本語
+hello 😀 flag 🇫🇷 sun ☀
+party 🎉 cup 🏆 globe 🌍 pizza 🍕 star ⭐
+sun ☀️ dev 👩‍💻 done
+Fish &, chips &.
+a;b:c
+time: 10:30
+a :b
+note:
+:start
+; leading
+hello (world)
+foo ; bar  :  baz
+hello   
+a • b • c
+“Hello”; please email user@host (now)… 🚀
+Numbers: one, two, three, four, five. Special items: at sign, hash, dollar, percent.
+The conference will be held on Tuesday, March 15th at 3:30 PM.
+a@b
+1+1=2
+Write to laurent.mazare@gmail.com!
+Mail (laurent+tag@gmail.com)
+a@.
+x @, y
+C++.
+1500+20
++33612345678
+foo@bar.com
++33612345678.
+It sold for £3.2m.
+We raised $2 million, then €3bn.
+Ring +44 20 7946 0958.
+Text 07700 900123 now.
+In 2019 2020 2021
+The card ending in -4098.
+It fell to -12.
+Your order number is 48213.
+Lt Col Vann and Lt. Col. Harris.
+Rated ★★★★☆, or ★★★½.
+Wait ~10 minutes, ±2.
+I ❤️ NY, dial *67, it's 4.5%.
+Press 1, then #.
+That was sooo good.
+He said, "go home!"
+It's the boys'
+'Stop it.'
+It's -40° outside.
+Water boils at 100°C, or 212 °F.
+It was -3.5°C, then 1°C.
+Turn 90°, then 1°.
+A 45°Ceiling
+1920×1080, 6÷2, x≤3, y≥4, a≠b, π≈3.14
+√2, ∞, 5‰ and ∑
+x² + y³ = 10⁻⁶
+C₈H₁₈ and ¹³C
+ΔH, α and ω
+and/or, to/from, reality/the deity.
+40 km/h, 5 mg/kg, c/o, 3/4, 05/04/2025
+bǎohù zìjǐ in İstanbul, città
+Il fait -5°C.
+Appelez le n°5, ou le N° 12.
+Turn 90°, then 10n°.
+El n.º 5, el nº 6, el n.° 7 y la N.º 8.
+Casa nº3.
+Es ist Haus n°3.
+Es sind 21°C.
+Hace 1° y 3×2.
+Il a levé 2 € millions, ★★★☆☆.
+O total é de R$ 1.234,56.
+A taxa é de R$ 250.
+Saldo: -R$ 12,50.
+Captamos R$ 3,5 bi no ano.
+O negócio vale R$1,5 mi.
+Custou R$ 1 mi.
+Vale R$ 1 bi.
+Fica entre R$ 40-60.
+Elle possède 40 000 livres.
+La prime est de 1 000 €.
+Il y a 1 200 000 habitants.
+Soit 1 234,56 kg.
+Le code est RR 123 456 789 GB.
+Appelez le 01 23 45 67 89.
+Les numéros 12 1234 et 07 123.
+Sie zahlte $2 Millionen.
+It's 1:06pm on 20/12/2015.
+Um 08:20 Uhr.
+en
+FR
+de
+es
+pt
+Lt.
+Sgt.
+Dec.
+Dec.,
+Thu.
+ed.
+w/o
+Col
+dec.
+Sun
+Dr.
+555-123-4567
+1-800-555-1234
+123-45-6789
+978-3-16-148410-0
+12-345-6789-01234
+4111-1111-1111-1111
+1-2-3
+0-1-2-3-4
+90-60-90
+205-55-16
+555_123_4567
+12-34_5678
+1_2_3
+1_000_000
+2024_05_12
+2024-05_12
+2024-13-45
+2024-05-123
+123-05-2024
+99-12-31
+2024-05-12-1
+800-1234-800
+555-123-4567.
+555-123-4567?!
+1/5/2011...
+16/01/1980
+12/31/2020.
+20/12/15
+1/5.
+1/5
+sooo
+Nooooo,
+Hiii
+Whyyy
+Ewww,
+Ahhh!
+good
+Zzz
+Brrr
+WWW
+Mmm
+0
+123
+2024
+1234
+1,234.56...
+3.14
+12.10
+-12.00
+1000000
+2500000
+2,500,000,
+1002003004
+-4500
+-12.
+007
+0600.
+7,000-ton
+20-year-old
+20-25
+10-5
+22-22
+3-5
+12:30
+10-15
+1445-1450
+2024-25
+1999-1998
+3.5%
+1234567890123
+hello
+12,345
+1,2,3
+1,23
+1234,567
+1,999
+0,123
+$5
+3:45PM
+1.234
+22.45
+12
+12345x
+1x
+is it?
+hello world!
+call me at 5
+éclair au chocolat
+one two three four five, six seven eight nine ten eleven twelve
+one, two three four five six seven eight
+Your number is {}. Thank you.
+word
