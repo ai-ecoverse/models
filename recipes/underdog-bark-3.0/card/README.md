@@ -81,10 +81,11 @@ clip and variant.
 The reference is transformers' feature extractor plus `generate()` on the unpacked fp32 weights. It was run on __CLIPS__
 English clips made with macOS `say`. The export was run on the same features, decoded greedily by `tdt.py`, with word
 error rate as slicc-ortllama computes it (case and punctuation folded). fp32 on `tdt.py`'s own NumPy features also
-matches token for token.
+matches token for token. fp16 emits the same tokens as PyTorch on every clip, but on some x86 hosts a blank step or
+a duration can move by one frame.
 
-| | Exact tokens and durations | WER vs PyTorch | WER vs script |
-| --- | --: | --: | --: |
+| | Exact tokens and durations | Same emitted tokens | WER vs PyTorch | WER vs script |
+| --- | --: | --: | --: | --: |
 __PARITY_ROWS__
 
 ## License

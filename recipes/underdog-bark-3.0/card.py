@@ -22,10 +22,11 @@ for v in a.variants:
     total = size(f"encoder_model{s}") + size(f"decoder_joint_model{s}")
     rows.append(f"| {v} | `onnx/encoder_model{s}.onnx` | `onnx/decoder_joint_model{s}.onnx` | {total / 1e6:,.0f} MB |")
 n = parity["clips"]
-prow = [f"| PyTorch fp32 | {n}/{n} | 0 | {parity['pytorch']['wer_vs_script']:.2%} |"]
+prow = [f"| PyTorch fp32 | {n}/{n} | {n}/{n} | 0 | {parity['pytorch']['wer_vs_script']:.2%} |"]
 for v in a.variants:
     r = parity["variants"][v]
-    prow.append(f"| {v} | {r['exact_tokens_and_durations']}/{n} | {r['wer_vs_pytorch']:.2%} | {r['wer_vs_script']:.2%} |")
+    prow.append(f"| {v} | {r['exact_tokens_and_durations']}/{n} | {r['same_emitted_tokens']}/{n} | {r['wer_vs_pytorch']:.2%} "
+                f"| {r['wer_vs_script']:.2%} |")
 card = (open(a.template).read().replace("__SOURCE_REPO__", e["RECIPE_SOURCE_REPO"])
         .replace("__SOURCE_REVISION__", e["RECIPE_SOURCE_REVISION"][:7]).replace("__VARIANT_ROWS__", "\n".join(rows))
         .replace("__PARITY_ROWS__", "\n".join(prow)).replace("__CLIPS__", str(n)))
