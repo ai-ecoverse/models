@@ -62,7 +62,7 @@ ortllama home, and fails unless:
 The declaration in `recipe.yaml`:
 
 ```yaml
-# engine: decoder, whisper, kokoro, silero or systemone (kev.js); parakeet once slicc-ortllama ships it
+# engine: decoder, whisper, parakeet, kokoro, silero or systemone (kev.js)
 # default: optional; variants: ortllama's names, so the _quantized suffix is q8
 # check: optional, off by default; only on runners with the RAM
 ortllama:
@@ -106,7 +106,7 @@ node scripts/ortllama-gate.mjs <recipe> --out <folder> --results /tmp/gate --ort
 | [`ministral-3-14b-instruct-2512`](recipes/ministral-3-14b-instruct-2512) | [ai-ecoverse/Ministral-3-14B-Instruct-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-14B-Instruct-2512-ONNX) | `gce-xl` | same; ~60 GB RAM for the fp32 parity reference |
 | [`ministral-3-14b-reasoning-2512`](recipes/ministral-3-14b-reasoning-2512) | [ai-ecoverse/Ministral-3-14B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-14B-Reasoning-2512-ONNX) | `gce-xl` | same |
 | [`tiny-random-llama`](recipes/tiny-random-llama) | — (`publish: false`) | `ubuntu-latest` | Pipeline smoke test; template for plain `torch.onnx.export` recipes; runs the ortllama gate (no `check`) |
-| [`underdog-bark-3.0`](recipes/underdog-bark-3.0) | ai-ecoverse/Underdog-Bark-3.0-ONNX (`publish: false` until ortllama ships its `parakeet` engine) | `ubuntu-latest` | Parakeet TDT speech recognition: `model.bark` unpacked with the source's loader, encoder + one-step decoder_joint graphs, fp32/fp16/q8/q4f16; parity gate against transformers' `generate()` on `say` clips; engine fixtures in `fixture/` |
+| [`underdog-bark-3.0`](recipes/underdog-bark-3.0) | [ai-ecoverse/Underdog-Bark-3.0-ONNX](https://huggingface.co/ai-ecoverse/Underdog-Bark-3.0-ONNX) | `ubuntu-latest` | Parakeet TDT speech recognition: `model.bark` unpacked with the source's loader, encoder + one-step decoder_joint graphs, fp32/fp16/q8/q4f16; parity gate against transformers' `generate()` on `say` clips; engine fixtures in `fixture/`; ortllama `parakeet` gate with `check` |
 
 ## Running locally
 

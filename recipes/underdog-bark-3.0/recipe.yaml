@@ -21,11 +21,19 @@ variants:
   - fp16
   - q8
   - q4f16
-# Not published until slicc-ortllama ships the parakeet engine: the pinned
-# ortllama can't list this layout yet, so the gate would fail on the declaration.
-# Then: publish: true and
-#   ortllama: {engine: parakeet, default: q8, variants: [q4f16, fp16, q8, fp32]}
+# What slicc-ortllama (1.23.0+, parakeet engine) must see in the export
+# (scripts/ortllama-gate.mjs). check: load q8 and transcribe one request
+# (~2 GB RAM).
+ortllama:
+  engine: parakeet
+  default: q8
+  variants:
+    - fp32
+    - fp16
+    - q8
+    - q4f16
+  check: true
 target:
   repo: ai-ecoverse/Underdog-Bark-3.0-ONNX
   path: ""
-publish: false
+publish: true
