@@ -30,11 +30,11 @@ Apache-2.0, like the model ([__SOURCE_REPO__](https://huggingface.co/__SOURCE_RE
 
 | File | What |
 | --- | --- |
-| `config.json` | the checkpoint's own config, with an `onnx` section: graph shapes, the Mimi decoder's state tensors, the voices and the default voice (`__DEFAULT_VOICE__`) |
+| `config.json` | the checkpoint's own config, with an `onnx` section: graph shapes, the Mimi decoder's state tensors, the voices, the default voice (`__DEFAULT_VOICE__`) and the graphs' extra inputs with their defaults (`duration_delta`: 0) |
 | `tokenizer.json` | the checkpoint's tokenizer (Unigram with byte fallback) |
-| `onnx/text_conditioner.onnx` | token IDs to text embeddings, plus the first step's embedding |
+| `onnx/text_conditioner.onnx` | token IDs to text embeddings, plus the first step's embedding for a `duration_delta` |
 | `onnx/flow_lm_main.onnx` | the flow LM transformer: embeddings and `past_key_values.*` to the last hidden state, the end-of-speech logit and `present.*` |
-| `onnx/flow_lm_flow.onnx` | the flow head: hidden state and noise to one 32-dim Mimi latent, and the next step's embedding |
+| `onnx/flow_lm_flow.onnx` | the flow head: hidden state and noise to one 32-dim Mimi latent, and the next step's embedding for a `duration_delta` |
 | `onnx/mimi_decoder.onnx` | the streaming Mimi decoder: N latents, an offset and __MIMI_STATE__ state tensors to 1920·N samples at 24 kHz and the next state |
 | `voices/<name>.bin` | voice prompts, already projected for the flow LM: `[125, 512]` float32, little-endian |
 | `export/` | the recipe that made this export, with its environment and provenance |
@@ -61,6 +61,14 @@ __PARITY__
 
 Free-running `fp32` with ptts's noise: __FREE__.
 
+With `duration_delta` at __DELTAS__ (ptts's `--condition duration_delta=…`), teacher-forced the same way:
+
+| `duration_delta` | Variant | Latent max abs error | Relative error, median / p99 | End-of-speech logit max error | Mimi audio SNR, min / median |
+| --- | --- | --- | --- | --- | --- |
+__DELTA_PARITY__
+
+Free-running `fp32`: __DELTA_FREE__.
+
 Voices: every `voices/<name>.bin` matches ptts's projection of the voice __VOICE_MATCH__.
 
 Text: slicc-ortllama __ORTLLAMA__'s English normalizer and tokenizer give ptts's normalized text, chunks and token IDs on __TOKENS__.
@@ -77,4 +85,4 @@ curl -s http://127.0.0.1:11435/v1/audio/speech -H 'content-type: application/jso
   -d '{"model": "ai-ecoverse/phonon-31m-en-ONNX", "input": "Hello from Phonon.", "voice": "easton"}' -o hello.mp3
 ```
 
-In plain onnxruntime: feed the voice prompt through `flow_lm_main` from an empty cache, then the text embeddings of each chunk, then one frame at a time: `flow_lm_main` on the previous step's embedding gives the hidden state and the end-of-speech logit, `flow_lm_flow` turns it and Gaussian noise (variance = temperature) into a latent and the next embedding, and `mimi_decoder` turns latents into audio. Stop a few frames after the end-of-speech logit passes `eos_threshold`.
+In plain onnxruntime: feed the voice prompt through `flow_lm_main` from an empty cache, then the text embeddings of each chunk, then one frame at a time: `flow_lm_main` on the previous step's embedding gives the hidden state and the end-of-speech logit, `flow_lm_flow` turns it and Gaussian noise (variance = temperature) into a latent and the next embedding, and `mimi_decoder` turns latents into audio. `text_conditioner` and `flow_lm_flow` also take `duration_delta`, a float32 `[1]` for the model's duration conditioner: 0 is its default pace, and every step of an utterance needs the same value. Stop a few frames after the end-of-speech logit passes `eos_threshold`.

@@ -15,6 +15,20 @@ def size(out, files):
     return sum(os.path.getsize(os.path.join(out, f)) for f in files.values())
 
 
+def row(v, r):
+    return (
+        f"| `{v}` | {r['latent_max']:.1e} | {r['latent_rel_p50']:.1e} / {r['latent_rel_p99']:.1e} | "
+        f"{r['eos_max']:.1e} | {r['mimi_snr_min']:.1f} / {r['mimi_snr_median']:.1f} dB |"
+    )
+
+
+def free_text(free):
+    return (
+        f"stops on the same frame as ptts in {free['same_length']} of {free['sentences']} sentences, "
+        f"PCM SNR {free['pcm_snr_min']:.1f} dB min and {free['pcm_snr_median']:.1f} dB median"
+    )
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--template", required=True)
@@ -32,17 +46,11 @@ def main():
     for v, (suffix, what) in LABELS.items():
         files = parity["graphs"][v]
         variants.append(f"| `{v}` | {f'`{suffix}`' if suffix else 'none'} | {what} | {size(a.out, files) / 1e6:.0f} MB |")
-        r = tf[v]
-        rows.append(
-            f"| `{v}` | {r['latent_max']:.1e} | {r['latent_rel_p50']:.1e} / {r['latent_rel_p99']:.1e} | "
-            f"{r['eos_max']:.1e} | {r['mimi_snr_min']:.1f} / {r['mimi_snr_median']:.1f} dB |"
-        )
+        rows.append(row(v, tf[v]))
     free = parity["free_running"]
-    free_text = (
-        f"stops on the same frame as ptts in {free['same_length']} of {free['sentences']} sentences, "
-        f"PCM SNR {free['pcm_snr_min']:.1f} dB min and {free['pcm_snr_median']:.1f} dB median "
-        "(f32 rounding compounds over the autoregression)"
-    )
+    deltas = sorted(parity["duration_delta"].items(), key=lambda x: float(x[0]))
+    delta_rows = [f"| {d} {row(v, run['teacher_forced'][v])}" for d, run in deltas for v in LABELS]
+    delta_free = "; ".join(f"at {d}, {free_text(run['free_running'])}" for d, run in deltas)
     sets = tokens["sets"]
     token_text = " and ".join(
         f"{s['identical']} of {s['inputs']} {'fuzzed strings' if name.startswith('fuzz') else 'test inputs'}"
@@ -64,7 +72,10 @@ def main():
         "__PARITY__": "\n".join(rows),
         "__SENTENCES__": str(free["sentences"]),
         "__FRAMES__": str(tf["fp32"]["frames"]),
-        "__FREE__": free_text,
+        "__FREE__": free_text(free) + " (f32 rounding compounds over the autoregression)",
+        "__DELTAS__": " and ".join(d for d, _ in deltas),
+        "__DELTA_PARITY__": "\n".join(delta_rows),
+        "__DELTA_FREE__": delta_free,
         "__VOICE_MATCH__": f"within {voice_max:.0e}" if voice_max else "bit for bit",
         "__ORTLLAMA__": tokens["ortllama"],
         "__TOKENS__": token_text,
