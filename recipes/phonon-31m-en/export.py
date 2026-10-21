@@ -172,7 +172,7 @@ class FlowHead(torch.nn.Module):
         self.faw = g("final_layer.adaLN_modulation.1.weight")
         self.fab = g("final_layer.adaLN_modulation.1.bias")
         self.liw = frozen(w["flow_lm.input_linear.weight"])
-        self.cond = cond
+        self.cond = frozen(cond)
 
     def time(self, te, t):
         freqs, w1, b1, w2, b2, alpha = te
@@ -180,7 +180,7 @@ class FlowHead(torch.nn.Module):
         e = torch.cat([torch.cos(a), torch.sin(a)], dim=-1)
         return rms(F.silu(e @ w1.t() + b1) @ w2.t() + b2, alpha)
 
-    def forward(self, hidden, noise, duration_delta):
+    def forward(self, hidden, noise):
         s = torch.zeros((hidden.shape[0], 1), dtype=torch.float32)
         t = torch.ones((hidden.shape[0], 1), dtype=torch.float32)
         tc = (self.time(self.te[0], s) + self.time(self.te[1], t)) * 0.5
@@ -196,54 +196,39 @@ class FlowHead(torch.nn.Module):
         shift, scale = ada[:, :D_MODEL], ada[:, D_MODEL:]
         h = F.layer_norm(x, (D_MODEL,), None, None, 1e-6) * (1 + scale) + shift
         latent = noise + (h @ self.fw.t() + self.fb)
-        nxt = latent @ self.liw.t() + self.cond(duration_delta)
+        nxt = latent @ self.liw.t() + self.cond
         return latent[:, None, :], nxt[:, None, :]
 
 
 class TextConditioner(torch.nn.Module):
-    def __init__(self, w, bos_embed, cond):
+    def __init__(self, w, bos_embed):
         super().__init__()
         self.table = frozen(w["flow_lm.condition_provider.conditioners.transcript_in_segment.embed.weight"])
         self.bos = frozen(bos_embed)
-        self.cond = cond
 
-    def forward(self, input_ids, duration_delta):
-        bos = self.bos + self.cond(duration_delta)
-        return self.table[input_ids], bos + torch.zeros_like(self.table[input_ids[:, :1]])
+    def forward(self, input_ids):
+        return self.table[input_ids], self.bos + torch.zeros_like(self.table[input_ids[:, :1]])
 
 
-class Conditions(torch.nn.Module):
-    def __init__(self, w, cfg):
-        super().__init__()
-        p = "flow_lm.condition_provider.conditioners"
-        static = torch.zeros(D_MODEL)
-        self.period = None
-        for c in cfg["conditioners"]:
-            name = c["name"]
-            proj = w.get(f"{p}.{name}.output_proj.weight")
-            if c["type"] == "lut":
-                idx = c["lut"]["possible_values"].index({"num_speakers": "1"}.get(name, "0"))
-                e = w[f"{p}.{name}.embed.weight"][idx]
-                static = static + (e if proj is None else proj @ e)
-            elif name == "duration_delta":
-                cc = c["continuous"]
-                half = cc["dim"] // 2
-                i = np.arange(half, dtype=np.float32) / np.float32(half - 1)
-                self.scale = float(cc["scale_factor"])
-                self.period = frozen(torch.from_numpy(np.float32(cc["max_period"]) ** i))
-                self.proj = None if proj is None else frozen(proj)
-            else:
-                raise SystemExit(f"continuous conditioner {name} is not supported")
-        if self.period is None:
-            raise SystemExit("no duration_delta conditioner")
-        self.static = frozen(static)
-
-    def forward(self, duration_delta):
-        phases = (duration_delta * self.scale) / self.period
-        e = torch.cat([torch.cos(phases), torch.sin(phases)])
-        if self.proj is not None:
-            e = e @ self.proj.t()
-        return self.static + e
+def conditions(w, cfg):
+    p = "flow_lm.condition_provider.conditioners"
+    total = torch.zeros(D_MODEL)
+    for c in cfg["conditioners"]:
+        name = c["name"]
+        if c["type"] == "lut":
+            idx = c["lut"]["possible_values"].index({"num_speakers": "1"}.get(name, "0"))
+            e = w[f"{p}.{name}.embed.weight"][idx]
+        else:
+            cc = c["continuous"]
+            half = cc["dim"] // 2
+            phases = (cc["scale_factor"] * 0.0) / (
+                cc["max_period"] ** (torch.arange(half, dtype=torch.float32) / (half - 1))
+            )
+            e = torch.cat([torch.cos(phases), torch.sin(phases)])
+        if f"{p}.{name}.output_proj.weight" in w:
+            e = w[f"{p}.{name}.output_proj.weight"] @ e
+        total = total + e
+    return total
 
 
 class MimiDecoder(torch.nn.Module):
@@ -359,11 +344,11 @@ class Phonon:
         w = load_weights(os.path.join(model_dir, "model.safetensors"))
         fl = self.cfg["flow_lm"]
         self.layers = fl["num_layers"]
-        self.cond = Conditions(w, self.cfg).eval()
+        cond = conditions(w, self.cfg)
         self.main = FlowLMMain(w, self.layers).eval()
-        self.flow = FlowHead(w, fl["flow_depth"], self.cond).eval()
-        bos = w["flow_lm.bos_emb"] @ w["flow_lm.input_linear.weight"].t()
-        self.text = TextConditioner(w, bos[None, None, :], self.cond).eval()
+        self.flow = FlowHead(w, fl["flow_depth"], cond).eval()
+        bos = w["flow_lm.bos_emb"] @ w["flow_lm.input_linear.weight"].t() + cond
+        self.text = TextConditioner(w, bos[None, None, :]).eval()
         self.mimi = MimiDecoder(w, self.cfg).eval()
         self.speaker = w["flow_lm.condition_provider.conditioners.speaker_wavs.output_proj.weight"]
 
@@ -398,17 +383,17 @@ def export(ph, out_dir):
         )
         torch.onnx.export(
             ph.flow,
-            (torch.zeros((1, D_MODEL)), torch.zeros((1, LDIM)), torch.zeros((1,))),
+            (torch.zeros((1, D_MODEL)), torch.zeros((1, LDIM))),
             os.path.join(out_dir, "flow_lm_flow.onnx"),
-            input_names=["hidden", "noise", "duration_delta"],
+            input_names=["hidden", "noise"],
             output_names=["latent", "next_embeds"],
             **common,
         )
         torch.onnx.export(
             ph.text,
-            (torch.zeros((1, 4), dtype=torch.int64), torch.zeros((1,))),
+            (torch.zeros((1, 4), dtype=torch.int64),),
             os.path.join(out_dir, "text_conditioner.onnx"),
-            input_names=["input_ids", "duration_delta"],
+            input_names=["input_ids"],
             output_names=["inputs_embeds", "bos_embeds"],
             dynamic_axes={"input_ids": {1: "sequence"}, "inputs_embeds": {1: "sequence"}},
             **common,
@@ -452,18 +437,13 @@ def quantize(onnx_dir, kind):
     for name in GRAPHS:
         src = os.path.join(onnx_dir, f"{name}.onnx")
         dst = os.path.join(onnx_dir, f"{name}_{kind}.onnx")
-        cond = [n.name for n in onnx.load(src).graph.node if n.name.startswith("/cond/")]
         if bits and name in FLOW_LM:
-            q = MatMulNBitsQuantizer(
-                onnx.load(src), block_size=32, is_symmetric=True, bits=bits, accuracy_level=4, nodes_to_exclude=cond
-            )
+            q = MatMulNBitsQuantizer(onnx.load(src), block_size=32, is_symmetric=True, bits=bits, accuracy_level=4)
             q.process()
             q.model.save_model_to_file(dst, False)
         elif bits is None:
             blocked = list(DEFAULT_OP_BLOCK_LIST) + ["Sin", "Cos", "Range"]
-            m = convert_float_to_float16(
-                onnx.load(src), keep_io_types=True, op_block_list=blocked, node_block_list=cond
-            )
+            m = convert_float_to_float16(onnx.load(src), keep_io_types=True, op_block_list=blocked)
             onnx.save(dedupe(m), dst)
 
 
@@ -536,7 +516,6 @@ def main():
         "mimi_state": [[n, list(s)] for n, s in ph.mimi.state_shapes()],
         "voices": entries,
         "default_voice": DEFAULT_VOICE,
-        "inputs": {"duration_delta": {"default": 0}},
     }
     with open(os.path.join(a.out, "config.json"), "w") as f:
         json.dump(cfg, f, indent=2)
