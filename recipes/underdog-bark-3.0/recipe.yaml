@@ -1,0 +1,31 @@
+# Underdog Bark 3.0 (Conway Research), an English fine-tune of NVIDIA's
+# parakeet-tdt-0.6b-v3, from its entropy-coded model.bark to ONNX for a
+# slicc-ortllama `parakeet` engine: onnx/encoder_model{suffix}.onnx (FastConformer
+# + projection) and onnx/decoder_joint_model{suffix}.onnx (one greedy TDT step).
+# The mel frontend runs in the client; preprocessor_config.json spells it out.
+name: underdog-bark-3.0
+summary: "Underdog Bark 3.0 (Parakeet TDT 0.6B), encoder + decoder_joint ONNX"
+# 0.6B parameters: ~2.5 GB unpacked fp32, ~5 GB of variants, ~12 GB peak disk, ~8 GB RAM.
+runner: ubuntu-latest
+timeout: 90
+python: "3.12"
+source:
+  repo: ConwayResearch/Underdog-Bark-3.0
+  revision: 85db2ad18ab41e534a222ee253c29191d77ed919
+# Bark uses the original's tokenizer and feature extractor; bark_loader.py loads them from here.
+processor:
+  repo: nvidia/parakeet-tdt-0.6b-v3
+  revision: 541d1f99c6b0c3cd0b11a95167540bb8edefd82b
+variants:
+  - fp32
+  - fp16
+  - q8
+  - q4f16
+# Not published until slicc-ortllama ships the parakeet engine: the pinned
+# ortllama can't list this layout yet, so the gate would fail on the declaration.
+# Then: publish: true and
+#   ortllama: {engine: parakeet, default: q8, variants: [q4f16, fp16, q8, fp32]}
+target:
+  repo: ai-ecoverse/Underdog-Bark-3.0-ONNX
+  path: ""
+publish: false

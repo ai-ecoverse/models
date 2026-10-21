@@ -1,0 +1,1 @@
+Speech recognition on the device keeps your audio private and works without a network connection.
