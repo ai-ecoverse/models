@@ -2,6 +2,10 @@ import argparse
 import json
 import os
 import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from parity import EOS_TIE
 
 LABELS = {
     "fp32": ("", "float32"),
@@ -23,10 +27,21 @@ def row(v, r):
 
 
 def free_text(free):
-    return (
+    text = (
         f"stops on the same frame as ptts in {free['same_length']} of {free['sentences']} sentences, "
         f"PCM SNR {free['pcm_snr_min']:.1f} dB min and {free['pcm_snr_median']:.1f} dB median"
     )
+    excused = []
+    if free["near_ties"]:
+        excused.append(
+            f"{free['near_ties']} that stops on another frame on an end-of-speech near-tie "
+            f"(ptts's logit within {EOS_TIE:g} of the threshold)"
+        )
+    if free["ill_conditioned"]:
+        excused.append(
+            f"{free['ill_conditioned']} whose ptts trajectory a float64 PyTorch run with the same noise misses too"
+        )
+    return text + (f", not counting {' and '.join(excused)}" if excused else "")
 
 
 def main():

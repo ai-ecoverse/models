@@ -17,6 +17,8 @@ GATES = {
     "q4": {"latent_rel_p50": 0.25, "eos_max": 3.0},
 }
 FREE_SNR_MIN = 20.0
+EOS_TIE = 0.1
+FREE_EXCUSED_MAX = 2
 VOICE_MAX = 1e-5
 DELTAS = (-0.3, 0.3)
 
@@ -155,18 +157,54 @@ def teacher_forced(p, docs, voice, w_in):
     }
 
 
-def free_running(p, docs, voice):
+def noise_at(c, f):
+    return c["frames"][f]["noise"] if f < len(c["frames"]) else [0.0] * len(c["frames"][0]["noise"])
+
+
+def free_running_f64(ph, doc, voice, d, threshold):
+    import torch
+    from export import HEAD_DIM, HEADS
+
+    dd = torch.tensor([d], dtype=torch.float64)
+    pcm = []
+    with torch.no_grad():
+        for c in doc["chunks"]:
+            empty = [torch.zeros((1, HEADS, 0, HEAD_DIM), dtype=torch.float64) for _ in range(2 * ph.layers)]
+            past = ph.main(torch.from_numpy(voice).double(), *empty)[2:]
+            emb, x = ph.text(torch.tensor([c["tokens"]]), dd)
+            past = ph.main(emb, *past)[2:]
+            state = [t.double() for t in ph.mimi.init_state()]
+            offset = torch.tensor(0)
+            stop = eos_policy(c["frames_after_eos"])
+            for f in range(c["frame_budget"]):
+                out = ph.main(x, *past)
+                e, past = float(out[1][0, 0]), out[2:]
+                latent, x = ph.flow(out[0], torch.tensor([noise_at(c, f)], dtype=torch.float64), dd)
+                out = ph.mimi(latent, offset, *state)
+                offset, state = out[1], list(out[2:])
+                pcm.append(out[0][0, 0].numpy().astype(np.float32))
+                if stop(e > threshold):
+                    break
+    return np.concatenate(pcm)
+
+
+def free_running(p, docs, voice, f64):
     rows = []
     for doc in docs:
-        pcm, frames, ref_frames = [], 0, 0
-        for c in doc["chunks"]:
+        pcm, frames, ref_frames, drift, splits = [], 0, 0, 0.0, []
+        for k, c in enumerate(doc["chunks"]):
             past, x = p.prompt(voice, c["tokens"])
             decode = p.decoder()
             stop = eos_policy(c["frames_after_eos"])
-            n = 0
+            n, split = 0, None
             for f in range(c["frame_budget"]):
-                noise = c["frames"][f]["noise"] if f < len(c["frames"]) else [0.0] * len(c["frames"][0]["noise"])
+                noise = noise_at(c, f)
                 hidden, e, past = p.run_main(x, past)
+                if split is None and f < len(c["frames"]):
+                    r = c["frames"][f]["eos"]
+                    drift = max(drift, abs(e - r))
+                    if (e > p.threshold) != (r > p.threshold):
+                        split = {"chunk": k, "frame": f, "eos": e, "ptts_eos": r, "margin": r - p.threshold}
                 latent, x = p.step(hidden, noise)
                 pcm.append(decode(latent))
                 n += 1
@@ -174,20 +212,33 @@ def free_running(p, docs, voice):
                     break
             frames += n
             ref_frames += len(c["frames"])
+            if n != len(c["frames"]):
+                splits.append(split)
         out = np.concatenate(pcm)
         same = frames == ref_frames
-        rows.append(
-            {
-                "file": doc["file"],
-                "frames": frames,
-                "ref_frames": ref_frames,
-                "snr": snr(doc["pcm"], out) if same else None,
-            }
-        )
-    snrs = [r["snr"] for r in rows if r["snr"] is not None]
+        row = {
+            "file": doc["file"],
+            "frames": frames,
+            "ref_frames": ref_frames,
+            "snr": snr(doc["pcm"], out) if same else None,
+            "eos_drift": drift,
+            "splits": splits,
+            "near_tie": bool(splits)
+            and all(s and abs(s["margin"]) < EOS_TIE and abs(s["eos"] - s["ptts_eos"]) < EOS_TIE for s in splits),
+            "ill_conditioned": False,
+        }
+        if same and row["snr"] < FREE_SNR_MIN:
+            ref64 = f64(doc)
+            row["f64_snr"] = snr(doc["pcm"], ref64) if ref64.shape == doc["pcm"].shape else None
+            row["ill_conditioned"] = row["f64_snr"] is None or row["f64_snr"] < FREE_SNR_MIN
+        rows.append(row)
+    snrs = [r["snr"] for r in rows if r["snr"] is not None and not r["ill_conditioned"]]
     return {
         "sentences": len(rows),
         "same_length": sum(r["frames"] == r["ref_frames"] for r in rows),
+        "near_ties": sum(r["near_tie"] for r in rows),
+        "ill_conditioned": sum(r["ill_conditioned"] for r in rows),
+        "eos_drift_max": float(max(r["eos_drift"] for r in rows)),
         "pcm_snr_min": float(min(snrs)) if snrs else None,
         "pcm_snr_median": float(np.median(snrs)) if snrs else None,
         "rows": rows,
@@ -217,8 +268,12 @@ def gate_run(tf, free, at):
                 problems.append(f"{variant}{at}: {key} {got[key]:.3g} (limit {limit:g})")
     if free is None:
         return problems + [f"fp32 free-running{at}: not measured"]
-    if free["same_length"] != free["sentences"]:
-        problems.append(f"fp32 free-running{at}: {free['sentences'] - free['same_length']} sentence(s) stop on another frame than ptts")
+    off = free["sentences"] - free["same_length"] - free["near_ties"]
+    if off:
+        problems.append(f"fp32 free-running{at}: {off} sentence(s) stop on another frame than ptts")
+    excused = free["near_ties"] + free["ill_conditioned"]
+    if excused > FREE_EXCUSED_MAX:
+        problems.append(f"fp32 free-running{at}: {excused} sentence(s) excused (limit {FREE_EXCUSED_MAX})")
     if free["pcm_snr_min"] is not None and free["pcm_snr_min"] < FREE_SNR_MIN:
         problems.append(f"fp32 free-running{at}: PCM SNR {free['pcm_snr_min']:.1f} dB (limit {FREE_SNR_MIN:g})")
     return problems
@@ -249,10 +304,15 @@ def main():
     ap.add_argument("--results", required=True)
     ap.add_argument("--threads", type=int, default=4)
     a = ap.parse_args()
+    import torch
     from export import Phonon
 
+    torch.set_num_threads(a.threads)
+
     ph = Phonon(a.model)
-    w_in = ph.flow.liw.detach().numpy()
+    w_in = ph.flow.liw.detach().numpy().copy()
+    for m in (ph.main, ph.flow, ph.text, ph.mimi):
+        m.double()
     results = {"graphs": {}, "duration_delta": {}}
     for ref in a.ref:
         docs = reference(ref)
@@ -266,7 +326,9 @@ def main():
             r = teacher_forced(p, docs, voice, w_in)
             run["teacher_forced"][variant] = r
             print(f"duration_delta={d}", variant, json.dumps(r), flush=True)
-        run["free_running"] = free_running(Pipeline(a.out, "fp32", a.threads, d), docs, voice)
+        p = Pipeline(a.out, "fp32", a.threads, d)
+        f64 = lambda doc: free_running_f64(ph, doc, voice, d, p.threshold)
+        run["free_running"] = free_running(p, docs, voice, f64)
         free = {k: v for k, v in run["free_running"].items() if k != "rows"}
         print(f"duration_delta={d}", "fp32 free-running", json.dumps(free), flush=True)
     results["voices"] = voices(a.out, a.ref_voices)
