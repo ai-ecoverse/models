@@ -81,11 +81,17 @@ fn plan(tokenizer: &str, input: &str) -> Result<()> {
     Ok(())
 }
 
-fn load(dir: &Path) -> Result<(TTSConfig, TTSModel<Q>)> {
+fn load(dir: &Path, conditions: &[String]) -> Result<(TTSConfig, TTSModel<Q>)> {
     let cfg: TTSConfig = serde_json::from_str(&std::fs::read_to_string(dir.join("config.json"))?)?;
     let tokenizer = Tok::open(&dir.join("tokenizer.json"))?;
     let vb = load_weights::<Q>(&dir.join("model.safetensors"), &xn::CPU)?;
-    let conditions = std::collections::HashMap::new();
+    let conditions = conditions
+        .iter()
+        .map(|c| {
+            let (name, value) = c.split_once('=').context("a condition is NAME=VALUE")?;
+            Ok((name.to_owned(), value.to_owned()))
+        })
+        .collect::<Result<std::collections::HashMap<_, _>>>()?;
     let model = TTSModel::load(&vb, Box::new(tokenizer), &cfg, &conditions)?;
     Ok((cfg, model))
 }
@@ -95,7 +101,7 @@ fn voice(cfg: &TTSConfig, model: &TTSModel<Q>, path: &Path) -> Result<Tensor<f32
 }
 
 fn voices(dir: &str, out: &str, files: &[String]) -> Result<()> {
-    let (cfg, model) = load(Path::new(dir))?;
+    let (cfg, model) = load(Path::new(dir), &[])?;
     std::fs::create_dir_all(out)?;
     for file in files {
         let path = PathBuf::from(file);
@@ -108,8 +114,16 @@ fn voices(dir: &str, out: &str, files: &[String]) -> Result<()> {
     Ok(())
 }
 
-fn speak(dir: &str, voice_file: &str, temperature: f32, seed: u64, input: &str, out: &str) -> Result<()> {
-    let (cfg, model) = load(Path::new(dir))?;
+fn speak(
+    dir: &str,
+    voice_file: &str,
+    temperature: f32,
+    seed: u64,
+    input: &str,
+    out: &str,
+    conditions: &[String],
+) -> Result<()> {
+    let (cfg, model) = load(Path::new(dir), conditions)?;
     let out = PathBuf::from(out);
     std::fs::create_dir_all(&out)?;
     let emb = voice(&cfg, &model, Path::new(voice_file))?;
@@ -174,6 +188,7 @@ fn speak(dir: &str, voice_file: &str, temperature: f32, seed: u64, input: &str, 
             "normalized": normalize.apply(line),
             "temperature": temperature,
             "seed": seed,
+            "conditions": conditions,
             "chunks": js,
         });
         std::fs::write(out.join(format!("{n:02}.json")), serde_json::to_string(&doc)?)?;
@@ -188,9 +203,11 @@ fn main() -> Result<()> {
     match a.get(1).map(String::as_str) {
         Some("plan") if a.len() == 4 => plan(&a[2], &a[3]),
         Some("voices") if a.len() >= 5 => voices(&a[2], &a[3], &a[4..]),
-        Some("speak") if a.len() == 8 => speak(&a[2], &a[3], a[4].parse()?, a[5].parse()?, &a[6], &a[7]),
+        Some("speak") if a.len() >= 8 => {
+            speak(&a[2], &a[3], a[4].parse()?, a[5].parse()?, &a[6], &a[7], &a[8..])
+        }
         _ => bail!(
-            "usage: ptts-ref plan TOKENIZER LINES | voices MODEL OUT VOICE... | speak MODEL VOICE TEMPERATURE SEED LINES OUT"
+            "usage: ptts-ref plan TOKENIZER LINES | voices MODEL OUT VOICE... | speak MODEL VOICE TEMPERATURE SEED LINES OUT [NAME=VALUE...]"
         ),
     }
 }

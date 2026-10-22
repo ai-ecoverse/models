@@ -29,6 +29,10 @@ rm -rf ref
 mkdir -p ref
 (cd voices && "$REF" voices ../src ../ref/voices "${VOICE_FILES[@]}") > "$RESULTS/ptts-voices.log"
 "$REF" speak src "voices/$EASTON" 0.3 42 "$RECIPE_DIR/inputs/speech.txt" ref/speech > "$RESULTS/ptts-speech.log"
+for d in -0.3 0.3; do
+  "$REF" speak src "voices/$EASTON" 0.3 42 "$RECIPE_DIR/inputs/speech.txt" "ref/speech$d" "duration_delta=$d" \
+    > "$RESULTS/ptts-speech$d.log"
+done
 $P "$RECIPE_DIR/fuzz.py" ref/fuzz.txt
 "$REF" plan src/tokenizer.json "$RECIPE_DIR/inputs/text.txt" > ref/text.jsonl
 "$REF" plan src/tokenizer.json ref/fuzz.txt > ref/fuzz.jsonl
@@ -41,8 +45,8 @@ cp "$LIB/../scripts/ortllama/package.json" "$LIB/../scripts/ortllama/package-loc
 status=0
 node "$RECIPE_DIR/tokens.mjs" --ortllama ortllama --tokenizer "$OUT/tokenizer.json" \
   --ref ref/text.jsonl --ref ref/fuzz.jsonl --results "$RESULTS/tokens.json" || status=1
-$P "$RECIPE_DIR/parity.py" --out "$OUT" --model src --ref ref/speech --ref-voices ref/voices \
-  --results "$RESULTS" || status=1
+$P "$RECIPE_DIR/parity.py" --out "$OUT" --model src --ref ref/speech --ref ref/speech-0.3 --ref ref/speech0.3 \
+  --ref-voices ref/voices --results "$RESULTS" || status=1
 [[ $status == 0 ]] || exit 1
 
 $P "$RECIPE_DIR/card.py" --template "$RECIPE_DIR/card.md" --results "$RESULTS" --out "$OUT"
