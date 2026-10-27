@@ -57,7 +57,13 @@ ortllama home, and fails unless:
   (ortllama only looks for data files it is told about or that exist);
 - with `default:`, the default variant is that one;
 - with `check: true`, `ortllama check` loads the default variant and answers one
-  request (installs `onnxruntime-node` too; a 3B q4f16 needs ~4 GB RAM).
+  request (installs `onnxruntime-node` too; a 3B q4f16 needs ~4 GB RAM);
+- with `recipes/<name>/response_cases.json` (recorded replies and the messages
+  they parse to), ortllama's own reply parser returns each of those messages.
+  ortllama doesn't read a tokenizer's `response_template`; it parses reasoning
+  and tool calls itself, so this keeps the two in agreement. The recipe holds
+  transformers' `parse_response` to the same file, and an export whose
+  `tokenizer_config.json` has a `response_template` fails without it.
 
 The declaration in `recipe.yaml`:
 
@@ -100,7 +106,7 @@ node scripts/ortllama-gate.mjs <recipe> --out <folder> --results /tmp/gate --ort
 
 | Recipe | Hub repo | Runner | Notes |
 | --- | --- | --- | --- |
-| [`ministral-3-3b-reasoning-2512`](recipes/ministral-3-3b-reasoning-2512) | [ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX) | `gce-xl` | Reasoning weights in Mistral's Instruct ONNX graphs; 5 variants, ~36 GB; parity gate against PyTorch fp32; ortllama gate with `check` |
+| [`ministral-3-3b-reasoning-2512`](recipes/ministral-3-3b-reasoning-2512) | [ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX) | `gce-xl` | Reasoning weights in Mistral's Instruct ONNX graphs; 5 variants, ~36 GB; parity gate against PyTorch fp32; response template checked on recorded replies in transformers and ortllama; ortllama gate with `check` |
 | [`ministral-3-8b-instruct-2512`](recipes/ministral-3-8b-instruct-2512) | [ai-ecoverse/Ministral-3-8B-Instruct-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-8B-Instruct-2512-ONNX) | `gce-xl` | genai-builder decoder (q4f16, q4) + fp16 vision/embeddings ([`lib/ministral3`](lib/ministral3)); from the BF16 checkpoint; ortllama gate with `check` |
 | [`ministral-3-8b-reasoning-2512`](recipes/ministral-3-8b-reasoning-2512) | [ai-ecoverse/Ministral-3-8B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-8B-Reasoning-2512-ONNX) | `gce-xl` | same |
 | [`ministral-3-14b-instruct-2512`](recipes/ministral-3-14b-instruct-2512) | [ai-ecoverse/Ministral-3-14B-Instruct-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-14B-Instruct-2512-ONNX) | `gce-xl` | same; ~60 GB RAM for the fp32 parity reference |

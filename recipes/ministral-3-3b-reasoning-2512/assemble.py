@@ -6,10 +6,12 @@ From the reference ONNX repo: config.json (it carries transformers.js_config and
 knows) and preprocessor_config.json (the base checkpoint has none). From the base checkpoint: its own tokenizer,
 template, special tokens, processor and generation config; the generation config also gets the sampling Mistral's model
 card recommends (temperature 0.7, top_p 0.95). tokenizer_config.json also gets the template inline, as in the
-reference.
+reference, and the response template in response_template.json (how transformers' parse_response turns a raw reply
+into reasoning_content, content and tool_calls; contributed by Nico Martin of Hugging Face).
 """
 import argparse, json, os, shutil, sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
 FROM_REF = ["config.json", "preprocessor_config.json"]
 SAMPLING = {"temperature": 0.7, "top_p": 0.95}
 FROM_CKPT = ["tokenizer.json", "special_tokens_map.json", "chat_template.jinja", "processor_config.json", "generation_config.json", "SYSTEM_PROMPT.txt"]
@@ -37,6 +39,7 @@ def main():
     json.dump(gc, open(os.path.join(a.out, "generation_config.json"), "w"), indent=2)
     tc = json.load(open(os.path.join(a.ckpt, "tokenizer_config.json")))
     tc["chat_template"] = open(os.path.join(a.ckpt, "chat_template.jinja")).read()
+    tc["response_template"] = json.load(open(os.path.join(HERE, "response_template.json")))
     json.dump(tc, open(os.path.join(a.out, "tokenizer_config.json"), "w"), indent=2, ensure_ascii=False)
     print("assembled", sorted(os.listdir(a.out)))
 

@@ -81,6 +81,22 @@ const output = await model.generate({
 
 `[THINK]` and `[/THINK]` are special tokens; keep `skip_special_tokens: false` to see where the reasoning ends. For images, pass `{ type: "image" }` in the message content and the image to the processor, as on the [Instruct ONNX card](https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-ONNX).
 
+### Parsing replies
+
+`tokenizer_config.json` carries a [response template](https://huggingface.co/docs/transformers/en/chat_response_parsing), so transformers' `parse_response` (and `get_response_parser` for streaming) turns a raw reply into an assistant message with `reasoning_content`, `content` and `tool_calls`, ready to append to the conversation:
+
+```python
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX")
+prompt = tokenizer.apply_chat_template(messages, tools=tools, add_generation_prompt=True, tokenize=False)
+reply = tokenizer.decode(output_ids, skip_special_tokens=False)  # keep [THINK], [TOOL_CALLS], [ARGS] and </s>
+message = tokenizer.parse_response(reply, prefix=prompt, tools=tools)
+# {"role": "assistant", "reasoning_content": "…", "tool_calls": [{"type": "function", "function": {"name": "get_weather", "arguments": {"city": "Paris"}}}]}
+```
+
+The reply must be decoded with its special tokens: without them the reasoning, the tool calls and the answer run together. Tool calls are `[TOOL_CALLS]name[ARGS]{…}`, several in a row for parallel calls, and the turn ends with `</s>`. slicc-ortllama parses replies the same way with its own parser.
+
 ## How it was made
 
 __PROVENANCE__
