@@ -5,6 +5,9 @@
  * variants recipe.yaml declares under `ortllama:`, and every one of them resolves
  * with all its files. With `ortllama.check: true` it also runs `ortllama check` on
  * the default variant (loads it and makes one request; needs onnxruntime-node).
+ * A recipe with recipes/<name>/response_cases.json (recorded replies and the
+ * messages they parse to) also needs ortllama's own reply parser to return those
+ * messages, so ortllama and the export's response_template read replies alike.
  *
  *   node scripts/ortllama-gate.mjs <recipe> --out DIR --results DIR --ortllama DIR
  *
@@ -14,7 +17,8 @@
  * published model out on purpose.
  */
 import { spawnSync } from 'node:child_process';
-import { createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -205,5 +209,84 @@ if (spec.check === 'true' && problems.length === 0) {
   if (check.status !== 0)
     problems.push(`ortllama check ${target} exited ${check.status}: ${(parsed?.summary ?? check.stderr).trim().split('\n').at(-1)}`);
   else say(`check ok: loaded in ${Math.round(parsed.loadMs)} ms, request ${Math.round(parsed.requestMs)} ms`);
+}
+
+// Replies. ortllama doesn't read the tokenizer's response_template: its decoder
+// engine parses reasoning and tool calls itself, token by token (stream.js, with
+// the markers of the chat profile it picks). A recipe that ships a response
+// template records replies and the messages they parse to in response_cases.json,
+// and holds transformers to them in its own check; ortllama must agree. The parser
+// isn't in the package's exports, so it's loaded by path, like index.js above.
+const casesPath = join(root, 'recipes', name, 'response_cases.json');
+const readJson = (path) => (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null);
+const tokenizerConfig = readJson(join(out, 'tokenizer_config.json'));
+if (tokenizerConfig?.response_template && !existsSync(casesPath))
+  problems.push(`tokenizer_config.json has a response_template, but recipes/${name}/response_cases.json is missing`);
+if (existsSync(casesPath) && spec.engine !== 'decoder')
+  problems.push(`response_cases.json is only checked for the decoder engine, not ${spec.engine}`);
+if (existsSync(casesPath) && spec.engine === 'decoder') report.replies = await replies(readJson(casesPath).cases);
+
+async function replies(cases) {
+  const src = join(pkg, 'src', 'engines', 'decoder');
+  const { createParser } = await import(pathToFileURL(join(src, 'stream.js')).href);
+  const { pickProfile } = await import(pathToFileURL(join(src, 'profiles.js')).href);
+  const tokenizers = await import(pathToFileURL(createRequire(join(pkg, 'package.json')).resolve('@huggingface/tokenizers')).href);
+  const Tokenizer = tokenizers.Tokenizer ?? tokenizers.default.Tokenizer;
+  const templateFile = join(out, 'chat_template.jinja');
+  const template = existsSync(templateFile) ? readFileSync(templateFile, 'utf8') : tokenizerConfig.chat_template;
+  const profile = pickProfile(typeof template === 'string' ? template : template.find((t) => t.name === 'default').template);
+  const tokenizerJson = readJson(join(out, 'tokenizer.json'));
+  const tokenizer = new Tokenizer(profile.tokenizer(tokenizerJson), tokenizerConfig);
+  const special = new Set(tokenizerJson.added_tokens.filter((t) => t.special).map((t) => t.id));
+  const markers = Object.fromEntries(Object.entries(profile.markers).map(([k, v]) => [k, tokenizer.token_to_id(v) ?? null]));
+  const eosName = typeof tokenizerConfig.eos_token === 'string' ? tokenizerConfig.eos_token : tokenizerConfig.eos_token?.content;
+  const eos = tokenizer.token_to_id(eosName);
+  const decode = (ids) => tokenizer.decode(ids, { skip_special_tokens: false });
+  const rows = [];
+  for (const c of cases) {
+    const got = { reasoning_content: '', content: '', tool_calls: [] };
+    const parser = createParser({
+      decode,
+      markers,
+      special,
+      newId: () => 'call',
+      emit(e) {
+        if (e.type === 'content') got.content += e.text;
+        else if (e.type === 'reasoning') got.reasoning_content += e.text;
+        else if (e.type === 'tool') got.tool_calls[e.index] = { name: e.name, arguments: '' };
+        else if (e.type === 'args') got.tool_calls[e.index].arguments += e.text;
+      },
+    });
+    // ortllama stops on end of sequence without handing it to the parser.
+    const ids = tokenizer.encode(c.raw, { add_special_tokens: false }).ids;
+    while (ids.length > 0 && ids.at(-1) === eos) ids.pop();
+    for (const token of ids) parser.push(token);
+    parser.end();
+    let actual;
+    try {
+      actual = canonical({ ...got, tool_calls: got.tool_calls.map((t) => ({ name: t.name, arguments: JSON.parse(t.arguments || '{}') })) });
+    } catch (error) {
+      actual = { error: `tool call arguments are not JSON: ${error.message}` };
+    }
+    const expected = canonical({
+      ...c.expected,
+      tool_calls: (c.expected.tool_calls ?? []).map((t) => ({ name: t.function.name, arguments: t.function.arguments })),
+    });
+    const ok = JSON.stringify(actual) === JSON.stringify(expected);
+    rows.push({ case: c.name, ok, ...(ok ? {} : { ortllama: actual, expected }) });
+    if (!ok) problems.push(`reply ${c.name}: ortllama parses ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`);
+  }
+  say(`replies: ortllama parses ${rows.filter((r) => r.ok).length} of ${rows.length} recorded replies as response_cases.json expects`);
+  return rows;
+}
+
+// Trimmed text, no empty fields, keys sorted all the way down.
+function canonical(m) {
+  const sort = (v) =>
+    Array.isArray(v) ? v.map(sort) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort(v[k])])) : v;
+  const o = {};
+  for (const k of ['reasoning_content', 'content']) if (m[k]?.trim()) o[k] = m[k].trim();
+  if (m.tool_calls?.length) o.tool_calls = m.tool_calls;
+  return sort(o);
 }
 finish();

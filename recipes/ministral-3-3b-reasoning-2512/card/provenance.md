@@ -2,7 +2,7 @@ No model was re-exported from PyTorch. The graphs are Mistral's: the Reasoning a
 
 - Base checkpoint: [mistralai/Ministral-3-3B-Reasoning-2512](https://huggingface.co/mistralai/Ministral-3-3B-Reasoning-2512) at `4a36357c811bf511a7b625d132e12f22408aac91` (`model-0000{1,2}-of-00002.safetensors`, bf16).
 - Graphs and layout: [mistralai/Ministral-3-3B-Instruct-2512-ONNX](https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-ONNX) at `e1128d389145f96bb1c3c2625cb8ca255ffa7034`. Their node names, ops (`GroupQueryAttention`, `RotaryEmbedding`, `SkipSimplifiedLayerNormalization`, `MatMulNBits`, `GatherBlockQuantized`) and the YaRN rope caches come from an onnxruntime-genai-style model builder; `cos_cache` and `sin_cache` depend on the config only and are copied.
-- From the Reasoning checkpoint: `tokenizer.json`, `special_tokens_map.json`, `chat_template.jinja` (also inlined into `tokenizer_config.json`, as in the reference), `processor_config.json`, `generation_config.json` (with Mistral's recommended `temperature` 0.7 and `top_p` 0.95 added from the base model card), `SYSTEM_PROMPT.txt`. From the reference: `config.json` (it carries `transformers.js_config` and the text `model_type` transformers.js knows) and `preprocessor_config.json` (the checkpoint has none).
+- From the Reasoning checkpoint: `tokenizer.json`, `special_tokens_map.json`, `chat_template.jinja` (also inlined into `tokenizer_config.json`, as in the reference), `processor_config.json`, `generation_config.json` (with Mistral's recommended `temperature` 0.7 and `top_p` 0.95 added from the base model card), `SYSTEM_PROMPT.txt`. From the reference: `config.json` (it carries `transformers.js_config` and the text `model_type` transformers.js knows) and `preprocessor_config.json` (the checkpoint has none). Neither ships a response template; the one in `tokenizer_config.json` ([`response_template.json`](export/response_template.json)) was contributed by Nico Martin of Hugging Face ([discussion #1](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX/discussions/1)), and `response_check.py` requires it to parse the replies recorded in [`response_cases.json`](export/response_cases.json), from this export and synthetic, one-shot and streamed token by token; the slicc-ortllama gate requires ortllama's own parser to read them the same way.
 
 Weights, per initializer type, with the method the reference was made with:
 
@@ -24,6 +24,7 @@ python lib/fetch.py mistralai/Ministral-3-3B-Reasoning-2512 4a36357c811bf511a7b6
 python selftest.py --ref ref --tmp selftest-tmp --out results/selftest.json --tolerance 0.0005
 python build.py --ref ref --ckpt ckpt --out out --variants q4f16 q4 fp16 quantized fp32
 python assemble.py --ref ref --ckpt ckpt --out out
+python response_check.py --repo out --out results/response-template.json
 python fix_llama4.py --out out --ckpt ckpt --results results
 python parity.py torch --ckpt ckpt --repo out --ref-out results/torch
 python parity.py onnx --repo out --variant q4f16 --ref-out results/torch --out results/onnx-q4f16.json   # and every other variant

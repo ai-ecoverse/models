@@ -1,0 +1,33 @@
+{
+  "defaults": {
+    "role": "assistant"
+  },
+  "start_anchor": [
+    "[/INST]",
+    "[/TOOL_RESULTS]"
+  ],
+  "fields": {
+    "reasoning_content": {
+      "open": "[THINK]",
+      "close": "[/THINK]",
+      "content": "text"
+    },
+    "content": {
+      "close_pattern": "(?=\\[TOOL_CALLS\\])|</s>",
+      "content": "text"
+    },
+    "tool_calls": {
+      "open_pattern": "\\[TOOL_CALLS\\](?P<name>[^\\[]+)\\[ARGS\\]",
+      "close_pattern": "(?=\\[TOOL_CALLS\\])|</s>",
+      "content": "json",
+      "repeats": true,
+      "transform": {
+        "type": "function",
+        "function": {
+          "name": "{name}",
+          "arguments": "{content}"
+        }
+      }
+    }
+  }
+}

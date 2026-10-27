@@ -1,0 +1,522 @@
+{
+ "about": "Raw replies of this export and the message each must parse to. response_check.py holds transformers' parse_response (the response template in response_template.json) to `expected`; scripts/ortllama-gate.mjs holds slicc-ortllama's own parser to the same messages. `raw` is the decoded reply with special tokens kept, plus </s> when the model stopped. Cases with \"round_trip\": false parse to a message that renders back without the reply's stray whitespace.",
+ "cases": [
+  {
+   "name": "tool-auto",
+   "source": "q4f16, slicc-ortllama 1.28.0, temperature 0",
+   "messages": [
+    {
+     "role": "user",
+     "content": "Use the get_weather tool to look up the current weather in Paris."
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "raw": "[THINK]Okay, the user wants to know the current weather in Paris. I need to use the get_weather tool to fetch this information.\n\nFirst, I'll make sure to use the correct function and parameters. The function is called get_weather, and it requires a city name as input.\n\nI'll call the function with the city name \"Paris\".\n\nOnce I get the weather data, I'll present it to the user.\n\nLet me do that now.[/THINK][TOOL_CALLS]get_weather[ARGS]{\"city\": \"Paris\"}</s>",
+   "expected": {
+    "role": "assistant",
+    "reasoning_content": "Okay, the user wants to know the current weather in Paris. I need to use the get_weather tool to fetch this information.\n\nFirst, I'll make sure to use the correct function and parameters. The function is called get_weather, and it requires a city name as input.\n\nI'll call the function with the city name \"Paris\".\n\nOnce I get the weather data, I'll present it to the user.\n\nLet me do that now.",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "tool-required",
+   "source": "q4f16, slicc-ortllama 1.28.0, temperature 0",
+   "messages": [
+    {
+     "role": "user",
+     "content": "What's the weather in Paris?"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "raw": "[TOOL_CALLS]get_weather[ARGS]{\"city\": \"Paris\"}</s>",
+   "expected": {
+    "role": "assistant",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "tool-named",
+   "source": "q4f16, slicc-ortllama 1.28.0, temperature 0",
+   "messages": [
+    {
+     "role": "user",
+     "content": "What's the weather in Rome?"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_time",
+      "description": "Get the current local time in a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "raw": "[TOOL_CALLS]get_weather[ARGS]{\"city\": \"Rome\"}</s>",
+   "expected": {
+    "role": "assistant",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Rome"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "parallel",
+   "source": "q4f16, slicc-ortllama 1.28.0, temperature 0",
+   "messages": [
+    {
+     "role": "user",
+     "content": "Call get_weather for Paris and get_time for Tokyo, both now, in one turn."
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_time",
+      "description": "Get the current local time in a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "raw": "[TOOL_CALLS]get_weather[ARGS]{\"city\": \"Paris\"}[TOOL_CALLS]get_time[ARGS]{\"city\": \"Tokyo\"}</s>",
+   "expected": {
+    "role": "assistant",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     },
+     {
+      "type": "function",
+      "function": {
+       "name": "get_time",
+       "arguments": {
+        "city": "Tokyo"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "plain",
+   "source": "q4f16, slicc-ortllama 1.28.0, temperature 0",
+   "messages": [
+    {
+     "role": "user",
+     "content": "What is the capital of France? One sentence."
+    }
+   ],
+   "raw": "[THINK]Okay, the question is about the capital of France. I remember that the capital of France is Paris. I need to make sure this is correct and then present the answer in one sentence.\n\nThe capital of France is Paris.\n\nNow, to present the answer in one sentence: \"The capital of France is Paris.\"\n\nWait, is that correct? Let me double-check.\n\nYes, the capital of France is Paris.\n\nSo, the response should be: \"The capital of France is Paris.\"[/THINK]The capital of France is Paris.</s>",
+   "expected": {
+    "role": "assistant",
+    "reasoning_content": "Okay, the question is about the capital of France. I remember that the capital of France is Paris. I need to make sure this is correct and then present the answer in one sentence.\n\nThe capital of France is Paris.\n\nNow, to present the answer in one sentence: \"The capital of France is Paris.\"\n\nWait, is that correct? Let me double-check.\n\nYes, the capital of France is Paris.\n\nSo, the response should be: \"The capital of France is Paris.\"",
+    "content": "The capital of France is Paris."
+   }
+  },
+  {
+   "name": "plain-with-tool",
+   "source": "q4f16, slicc-ortllama 1.28.0, temperature 0",
+   "messages": [
+    {
+     "role": "user",
+     "content": "What is 2+2?"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "raw": "[THINK]Okay, the question is about the mathematical operation of 2 plus 2. I know that 2 plus 2 equals 4. But just to be sure, let me double-check.\n\n2 + 2 is indeed 4. There's no need for any external tools for this simple calculation.\n\nNow, to present the answer clearly.[/THINK]2 + 2 = 4</s>",
+   "expected": {
+    "role": "assistant",
+    "reasoning_content": "Okay, the question is about the mathematical operation of 2 plus 2. I know that 2 plus 2 equals 4. But just to be sure, let me double-check.\n\n2 + 2 is indeed 4. There's no need for any external tools for this simple calculation.\n\nNow, to present the answer clearly.",
+    "content": "2 + 2 = 4"
+   }
+  },
+  {
+   "name": "no-reasoning",
+   "source": "q4f16, slicc-ortllama 1.28.0, temperature 0",
+   "messages": [
+    {
+     "role": "user",
+     "content": "Name one primary colour."
+    }
+   ],
+   "raw": "Red</s>",
+   "expected": {
+    "role": "assistant",
+    "content": "Red"
+   }
+  },
+  {
+   "name": "after-tool-result",
+   "source": "q4f16, slicc-ortllama 1.28.0, temperature 0",
+   "messages": [
+    {
+     "role": "user",
+     "content": "What's the weather in Paris?"
+    },
+    {
+     "role": "assistant",
+     "content": "",
+     "tool_calls": [
+      {
+       "id": "abc123def",
+       "type": "function",
+       "function": {
+        "name": "get_weather",
+        "arguments": "{\"city\": \"Paris\"}"
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "tool_call_id": "abc123def",
+     "content": "sunny, 21C"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "raw": "[THINK]Okay, the user is asking for the weather in Paris. I need to get the current weather for that city. The function to get weather is called get_weather, and it takes a city name as input. The response from the function should be the current weather conditions and temperature.\n\nThe function call is made with the city \"Paris\". The response is that it's sunny with a temperature of 21 degrees Celsius.\n\nNow, I need to present this information to the user.\n\nThe response should be a clear statement of the weather conditions and temperature.[/THINK]The weather in Paris is sunny with a temperature of 21°C.</s>",
+   "expected": {
+    "role": "assistant",
+    "reasoning_content": "Okay, the user is asking for the weather in Paris. I need to get the current weather for that city. The function to get weather is called get_weather, and it takes a city name as input. The response from the function should be the current weather conditions and temperature.\n\nThe function call is made with the city \"Paris\". The response is that it's sunny with a temperature of 21 degrees Celsius.\n\nNow, I need to present this information to the user.\n\nThe response should be a clear statement of the weather conditions and temperature.",
+    "content": "The weather in Paris is sunny with a temperature of 21°C."
+   }
+  },
+  {
+   "name": "content-then-tool",
+   "source": "synthetic",
+   "messages": [
+    {
+     "role": "user",
+     "content": "Use the get_weather tool for Paris."
+    }
+   ],
+   "raw": "[THINK]Need the tool.[/THINK]Checking now.[TOOL_CALLS]get_weather[ARGS]{\"city\": \"Paris\"}</s>",
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "expected": {
+    "role": "assistant",
+    "reasoning_content": "Need the tool.",
+    "content": "Checking now.",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "whitespace-before-tool",
+   "source": "synthetic",
+   "messages": [
+    {
+     "role": "user",
+     "content": "Use the get_weather tool for Paris."
+    }
+   ],
+   "raw": "[THINK]Need the tool.[/THINK]\n\n[TOOL_CALLS]get_weather[ARGS]{\"city\": \"Paris\"}</s>",
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "expected": {
+    "role": "assistant",
+    "reasoning_content": "Need the tool.",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     }
+    ]
+   },
+   "round_trip": false
+  },
+  {
+   "name": "nested-args",
+   "source": "synthetic",
+   "messages": [
+    {
+     "role": "user",
+     "content": "Weather in Paris and Rome?"
+    }
+   ],
+   "raw": "[TOOL_CALLS]get_weather[ARGS]{\"city\": \"Paris [FR]\", \"extra\": {\"units\": [\"C\", \"F\"]}}</s>",
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string",
+         "description": "City name"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "expected": {
+    "role": "assistant",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris [FR]",
+        "extra": {
+         "units": [
+          "C",
+          "F"
+         ]
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "cut-off-reasoning",
+   "source": "synthetic",
+   "messages": [
+    {
+     "role": "user",
+     "content": "What is 17 times 23?"
+    }
+   ],
+   "raw": "[THINK]Okay, 17 times 23 is 17 times 20 plus",
+   "expected": {
+    "role": "assistant",
+    "reasoning_content": "Okay, 17 times 23 is 17 times 20 plus"
+   }
+  }
+ ]
+}
