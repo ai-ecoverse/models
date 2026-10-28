@@ -24,6 +24,7 @@ scripts/
   publish.py        # upload_folder to the Hub, then verify every file (SHA-256, fresh download)
   read-recipe.mjs   # recipe.yaml fields (--field, --json, --env)
   list-touched-recipes.mjs
+experiments/<name>/ # one-off studies with their code and results (not recipes: CI never runs them)
 ```
 
 `convert.sh` gets `RECIPE_DIR`, `WORK` (scratch, kept between local runs),

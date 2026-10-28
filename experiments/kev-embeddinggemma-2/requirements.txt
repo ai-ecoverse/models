@@ -1,0 +1,14 @@
+# Upstream jaredpalmer/kev@2074cc4's uv.lock versions (Python 3.13), except transformers: 5.19.0 is the first release
+# with embedding_gemma2 (upstream pins transformers>=5.17,<6 and locks 5.17.0, which does not have it).
+torch==2.8.0
+transformers==5.19.0
+peft==0.21.0
+accelerate==1.15.0
+numpy==2.5.3
+scikit-learn==1.9.1
+pydantic==2.13.5
+datasets==5.0.1
+huggingface-hub==1.32.0
+tokenizers==0.23.2
+safetensors==0.8.0
+hf-xet==1.7.0
