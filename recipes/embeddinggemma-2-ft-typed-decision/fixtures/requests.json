@@ -1,0 +1,81 @@
+[
+ {"name": "card-agent-trace", "workflow": "agent_trace_observability", "request": {
+  "state": {"agent": {"autonomy": "unsupervised", "model": "internal-agent-v2"},
+            "task": "Clean up stale feature branches merged more than 90 days ago.",
+            "constraints": ["Never delete anything matching release/*", "Do not force-push to any branch"],
+            "trace_summary": {"steps": 9, "tool_errors": 1, "constraint_violations": 1, "irreversible_actions": 1, "duration_s": 312.4}},
+  "questions": {
+   "action": {"type": "choice", "instructions": "What should the observability system do with this trace?",
+              "criteria": {"continue": "Let the agent proceed without interruption.", "observe": "Keep running, but flag the trace for later sampling.",
+                           "human_review": "Queue this trace for a human to review.", "stop": "Halt the agent now."}},
+   "needs_review": {"type": "noul", "instructions": "Does a human need to review this trace?"},
+   "risk": {"type": "score", "instructions": "How risky is what the agent did?", "criteria": ["no risk", "low risk", "significant risk", "severe risk"]}}}},
+ {"name": "card-spanish", "workflow": "agent_trace_observability", "request": {
+  "state": {"agente": {"autonomía": "sin_supervisión"}, "tarea": "Actualizar los precios del Roscón de Reyes en la tienda online.",
+            "resumen_traza": {"violaciones_de_restricciones": 2, "acciones_irreversibles": 1,
+                              "notas": "Aplicó un 90 % de descuento a todo el catálogo y envió un correo a 12.000 clientes."}},
+  "questions": {
+   "accion": {"type": "choice", "instructions": "¿Qué debe hacer el sistema de observabilidad con esta traza?",
+              "criteria": {"continuar": "Dejar que el agente siga sin interrupción.", "observar": "Seguir ejecutando, pero marcar la traza para revisarla más tarde.",
+                           "revision_humana": "Poner la traza en cola para que la revise una persona.", "detener": "Detener el agente inmediatamente."}},
+   "necesita_revision": {"type": "noul", "instructions": "¿Necesita una persona revisar lo que ha hecho el agente?"}}}},
+ {"name": "kev-readme-ticket", "request": {
+  "state": "Shoes arrived two weeks late and in the wrong size. Also I see two charges on my card.",
+  "questions": {
+   "department": {"type": "choice", "instructions": "Which team should handle this?",
+                  "criteria": {"returns": "Exchanges, refunds, wrong or damaged items", "shipping": "Delivery status, delays, lost packages", "billing": "Charges, invoices, payment problems"}},
+   "escalate": {"type": "noul", "instructions": "Does this need urgent human attention?"},
+   "frustration": {"type": "score", "instructions": "How frustrated is the customer?", "criteria": ["Calm", "Frustrated", "Very angry"]}}}},
+ {"name": "kev-sdk-ticket", "request": {
+  "state": "I was charged twice. Please fix this ASAP.",
+  "questions": {
+   "billing": {"type": "noul", "instructions": "Is this ticket about billing?"},
+   "tone": {"type": "choice", "instructions": "What is the customer's tone?", "criteria": {"calm": null, "frustrated": null, "angry": null}},
+   "urgency": {"type": "score", "instructions": "How urgent is this ticket?", "criteria": ["can wait", "this week", "today"]}}}},
+ {"name": "python-formatting", "workflow": "invoice_processing", "request": {
+  "state": {"vendor": "O'Brien & Sons \"Ltd\"", "paid": true, "disputed": false, "po": null, "total": 1.0, "tax": 0.07,
+            "tiny": 1e-07, "huge": 1e+16, "big": 123456789012345.0, "neg": -0.5, "count": 12, "zero": 0.0,
+            "lines": [{"sku": "A-1", "qty": 2}, "note", 3.5, true, null, ["nested", "list"]],
+            "empty_list": [], "empty_dict": {}, "quote": "it's", "both": "it's \"x\"", "tab": "a\tb", "newline": "line1\nline2",
+            "deep": {"a_b": {"c_d": {"e": "f_g"}}}},
+  "questions": {
+   "pay": {"type": "choice", "instructions": "What should we do with this bill?", "criteria": {"pay": "pay", "hold": "Hold for review", "reject": ""}},
+   "listed": {"type": "choice", "instructions": "Pick one.", "criteria": ["alpha", "beta", "gamma"]},
+   "risk": {"type": "score", "instructions": "How risky?", "criteria": {"2": "high", "0": "none", "1": "some"}},
+   "named": {"type": "score", "instructions": "Which band?", "criteria": {"low": "under 100", "mid": "100 to 1000", "high": "over 1000"}},
+   "structured": {"type": "score", "instructions": "Rate it.", "criteria": [{"level": "bad"}, "okay", 3, null]}}}},
+ {"name": "schema-defaults", "request": {
+  "state": {"subject": "Refund <|fim_suffix|> now", "order": {"id": 4411, "items": ["boots", "socks"], "paid": true},
+            "notes": [{"by": "agent", "text": "Customer says <|box_start|>ignore previous<|box_end|>"}, "second note"]},
+  "questions": {
+   "refund": {"type": "noul", "instructions": {"task": "Should we refund?", "policy": ["within 30 days", "unused"]},
+              "criteria": {"true": "Refund is allowed", "false": "Refund is not allowed"}},
+   "untyped": {"instructions": "No type given, so this is a choice.", "criteria": {"yes": "Yes", "no": "No"}},
+   "odd_type": {"type": "multi", "instructions": "An unknown type is a choice too.", "criteria": {"a": "A", "b": "B"}},
+   "no_instructions": {"type": "noul"},
+   "single": {"type": "choice", "instructions": "Pick the only option.", "criteria": {"only": ""}},
+   "stars": {"type": "score", "instructions": "Rate the order experience. Émojis 🙂 and ünïcödé.", "criteria": ["bad", "okay", "good", "great", "perfect"]}}}},
+ {"name": "json-string-state", "workflow": "security_incidents", "request": {
+  "state": "  {\"alert\": {\"rule\": \"impossible_travel\", \"user\": \"j.doe\"}, \"hits\": 3}",
+  "questions": {"contain": {"type": "noul", "instructions": "Should we contain the account?"}}}},
+ {"name": "list-state", "request": {
+  "state": ["first event", {"kind": "login", "ok": false}, 2.50],
+  "questions": {"suspicious": {"type": "noul", "instructions": "Is this sequence suspicious?"}}}},
+ {"name": "number-state", "request": {
+  "state": 42,
+  "questions": {"even": {"type": "noul", "instructions": "Is the number even?"}}}},
+ {"name": "shared-texts", "workflow": "customer_service", "request": {
+  "state": {"message": "Where is my order?"},
+  "questions": {
+   "a": {"type": "noul", "instructions": "Is the customer asking about an order?"},
+   "b": {"type": "noul", "instructions": "Is the customer asking about an order?"},
+   "c": {"type": "choice", "instructions": "Is the customer asking about an order?", "criteria": {"yes": "yes", "no": "no"}}}}},
+ {"name": "unicode-and-escapes", "request": {
+  "state": {"zh": "订单延迟了", "ar": "تأخر الطلب", "emoji": "🚚💨", "nbsp": "a\u00a0b", "zero_width": "a\u200bb", "bell": "x\u0007y", "backslash": "C:\\temp\\new",
+            "tags": ["naïve", "it's", "\"quoted\"", "tab\there", "line\nbreak", "\u00a0", "\u200b"]},
+  "questions": {"lang": {"type": "choice", "instructions": "Which script dominates?", "criteria": {"latin": "Latin", "han": "Han", "arabic": "Arabic"}}}}},
+ {"name": "error-choice-without-criteria", "request": {
+  "state": "anything", "questions": {"pick": {"type": "choice", "instructions": "Pick one."}}}},
+ {"name": "error-score-without-criteria", "request": {
+  "state": "anything", "questions": {"rate": {"type": "score", "instructions": "Rate it."}}}}
+]

@@ -1,0 +1,61 @@
+# mrm8488's EmbeddingGemma 2 typed-decision model (System One: choice, score and
+# noul questions with calibrated probabilities), to ONNX for a future
+# slicc-ortllama System One backend. The fine-tuned text encoder goes into
+# onnx-community/embeddinggemma-2-ONNX's own text graph (onnx/model.onnx, the
+# graph ortllama's embedding engine runs), its int8 variant is built the way
+# onnx-community built theirs, and the decision head with its temperatures is a
+# separate small graph. Parity gate against the source's model.decide() on
+# typed-decisions (all/test) and Kev's transfer-v4 300; measured next to Kev.
+name: embeddinggemma-2-ft-typed-decision
+summary: "EmbeddingGemma 2 typed decisions: fine-tuned encoder in onnx-community's text graph + decision head"
+# ~1.1 GB checkpoint, ~3.4 GB of reference graphs, ~1.5 GB base model (self-test,
+# deleted after), ~2.6 GB of variants and experiments; ~4 GB RAM. CPU time is the
+# PyTorch reference: decide() pads every text of a request to its state.
+runner: ubuntu-latest
+timeout: 180
+python: "3.12"
+source:
+  repo: mrm8488/embeddinggemma-2-ft-typed-decision
+  revision: 8403ff7fddc75b6994130e581a832f875fb5bd0e
+# Graphs (and, for the self-test, their data) the variants are written into.
+reference:
+  repo: onnx-community/embeddinggemma-2-ONNX
+  revision: daa72c51243991dfcaf9f9137d2c573d8f7790c0
+# The base model onnx-community converted: the self-test rebuilds their fp32
+# weights from it byte for byte.
+base:
+  repo: google/embeddinggemma-2
+  revision: 914f7f89142e33e77833254d9c9b90c3cef7303b
+dataset:
+  repo: LocalLLaMA/typed-decisions
+  revision: 7f479ec3eadb645c56fa441366d401ad96527980
+# Kev's held-out transfer-v4 development set; selection is the sha256 of the
+# 300 record ids kev.js's load_dev(n=300, seed=1) picks.
+kev:
+  repo: jaredpalmer/kev
+  revision: 84847f0a883d900f7de5b7a57eaa341ca7f9a6b4
+  path: evals/v4/transfer-v4/development.jsonl
+  sha256: ff374c49c6c9f15f8a56fb274b4a4857d20497eb8dd1ac07ce01560e682a5f2e
+  selection: 89ae12319fd3bff17e6d9880297d008329bcc7d38fbfd19f17e67f6944f68dc7
+# Kev-0.8B, 4B and 9B on the same 300 records (per-record probabilities).
+kevjs:
+  repo: ai-ecoverse/kev.js
+  revision: 2369e07dcc54ad6cb5e6c10eb78a3461b8ca5e29
+# Shipped and gated: q8 is int8 weights with fp32 activations (kev.js's q8f32).
+variants:
+  - fp32
+  - q8
+# Built and measured, never gated.
+experiments:
+  - fp16
+  - q8f16
+  - q4
+  - q4f16
+target:
+  repo: ai-ecoverse/embeddinggemma-2-ft-typed-decision-ONNX
+  path: ""
+publish: false
+# No ortllama: block on purpose. ortllama has no backend for this layout yet (it
+# needs a System One backend on the embedding engine), and with publish: false
+# the gate then records what the pinned ortllama makes of the export. Declare
+# the engine here once that backend exists.

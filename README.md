@@ -15,7 +15,7 @@ recipes/<name>/
   requirements.txt  # pinned Python packages (uv venv per recipe)
   convert.sh        # recipe body: runs in $WORK, writes the Hub repo's files to $OUT
   *.py, card/ …     # whatever the conversion needs, plus the model card template
-lib/                # shared code for recipes (fetch.py: verified, resumable Hub download)
+lib/                # shared code for recipes (fetch.py: verified, resumable Hub download, models or datasets)
   ministral3/       # Ministral 3 8B/14B export: genai-builder decoder, re-weighted 3B vision/embed graphs
 scripts/
   run.sh            # run one recipe: venv, convert.sh, export/ + provenance.json, ortllama gate
@@ -106,6 +106,7 @@ node scripts/ortllama-gate.mjs <recipe> --out <folder> --results /tmp/gate --ort
 
 | Recipe | Hub repo | Runner | Notes |
 | --- | --- | --- | --- |
+| [`embeddinggemma-2-ft-typed-decision`](recipes/embeddinggemma-2-ft-typed-decision) | — (`publish: false`) | `ubuntu-latest` | mrm8488's EmbeddingGemma 2 System One decision model: fine-tuned encoder in onnx-community's text graph (fp32, q8) + decision head graph; self-tests rebuild onnx-community's bytes; parity gate against `model.decide()` on typed-decisions and Kev's transfer-v4 300; golden rendering fixtures; Kev comparison; ortllama gate records only (no System One backend for it yet) |
 | [`ministral-3-3b-reasoning-2512`](recipes/ministral-3-3b-reasoning-2512) | [ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-3B-Reasoning-2512-ONNX) | `gce-xl` | Reasoning weights in Mistral's Instruct ONNX graphs; 5 variants, ~36 GB; parity gate against PyTorch fp32; response template checked on recorded replies in transformers and ortllama; ortllama gate with `check` |
 | [`ministral-3-8b-instruct-2512`](recipes/ministral-3-8b-instruct-2512) | [ai-ecoverse/Ministral-3-8B-Instruct-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-8B-Instruct-2512-ONNX) | `gce-xl` | genai-builder decoder (q4f16, q4) + fp16 vision/embeddings ([`lib/ministral3`](lib/ministral3)); from the BF16 checkpoint; ortllama gate with `check` |
 | [`ministral-3-8b-reasoning-2512`](recipes/ministral-3-8b-reasoning-2512) | [ai-ecoverse/Ministral-3-8B-Reasoning-2512-ONNX](https://huggingface.co/ai-ecoverse/Ministral-3-8B-Reasoning-2512-ONNX) | `gce-xl` | same |

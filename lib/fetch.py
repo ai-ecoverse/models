@@ -4,7 +4,7 @@ Each file is fetched over HTTP with Range requests into <file>.part, resumed aft
 place once its size and SHA-256 match the Hub's metadata (LFS sha256 for large files, git blob sha1 for small ones).
 Existing complete files are re-hashed and kept if they match.
 
-    python fetch.py REPO REVISION OUTDIR [--include GLOB ...] [--exclude GLOB ...]
+    python fetch.py REPO REVISION OUTDIR [--include GLOB ...] [--exclude GLOB ...] [--repo-type dataset]
 """
 import argparse, fnmatch, hashlib, os, sys, time
 import requests
@@ -37,14 +37,14 @@ def matches(sib, path):
     return git_sha1(path) == sib.blob_id
 
 
-def fetch(repo, rev, sib, out, session):
+def fetch(repo, rev, sib, out, session, repo_type=None):
     dest = os.path.join(out, sib.rfilename)
     if os.path.exists(dest) and matches(sib, dest):
         print(f"ok (present) {sib.rfilename}", flush=True)
         return
     os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
     part = dest + ".part"
-    url = hf_hub_url(repo, sib.rfilename, revision=rev)
+    url = hf_hub_url(repo, sib.rfilename, revision=rev, repo_type=repo_type)
     headers = build_hf_headers()
     total = sib.size
     t0 = last = time.time()
@@ -87,15 +87,16 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--include", nargs="*", default=["*"])
     ap.add_argument("--exclude", nargs="*", default=[])
+    ap.add_argument("--repo-type", choices=["model", "dataset"], default="model")
     a = ap.parse_args()
-    info = HfApi().model_info(a.repo, revision=a.revision, files_metadata=True)
+    info = HfApi().repo_info(a.repo, revision=a.revision, repo_type=a.repo_type, files_metadata=True)
     sibs = [s for s in info.siblings
             if any(fnmatch.fnmatch(s.rfilename, p) for p in a.include)
             and not any(fnmatch.fnmatch(s.rfilename, p) for p in a.exclude)]
     sibs.sort(key=lambda s: s.size or 0)
     with requests.Session() as session:
         for s in sibs:
-            fetch(a.repo, info.sha, s, a.out, session)
+            fetch(a.repo, info.sha, s, a.out, session, a.repo_type)
     print(f"all {len(sibs)} files verified at {info.sha}", flush=True)
 
 
