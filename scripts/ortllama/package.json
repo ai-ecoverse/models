@@ -4,7 +4,7 @@
   "description": "Pinned slicc-ortllama for scripts/ortllama-gate.mjs. onnxruntime-node is only installed for recipes with ortllama.check: true (npm ci --omit=optional otherwise); keep it at slicc-ortllama's exact peer version (Renovate leaves it alone).",
   "license": "Apache-2.0",
   "dependencies": {
-    "@ai-ecoverse/slicc-ortllama": "1.29.0"
+    "@ai-ecoverse/slicc-ortllama": "1.29.1"
   },
   "optionalDependencies": {
     "onnxruntime-node": "1.30.0"
