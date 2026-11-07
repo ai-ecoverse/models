@@ -7,6 +7,6 @@
     "@ai-ecoverse/slicc-ortllama": "1.29.3"
   },
   "optionalDependencies": {
-    "onnxruntime-node": "1.30.0"
+    "onnxruntime-node": "1.31.1"
   }
 }
